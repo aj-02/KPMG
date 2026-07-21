@@ -1,0 +1,3261 @@
+--------------------------------------------------------------------------------
+21.07.26 DEV      Program ZMM_VEND_MASTER attrib                Page      1
+--------------------------------------------------------------------------------
+
+
+
+Created on....11.12.2025    Last changed on/by........ 21.07.2026 UDAYABAP03
+Author........UDAYABAP01
+--------------------------------------------------------------------------------
+
+Title.........Mass Vendor Upload
+
+Type..................1     Reporting
+Status................
+Application...........
+Class.................
+Logical database......
+  from Application....
+Selection screen......
+Authorization group...
+Package...............ZMM_ABAP
+
+  Start by Variants
+  Deactivate editor lock
+X Fixed point arithmetic active
+--------------------------------------------------------------------------------
+21.07.26 DEV      Program ZMM_VEND_MASTER                       Page      2
+--------------------------------------------------------------------------------
+
+    1  *&---------------------------------------------------------------------*
+    2  *& Report ZMM_VEND_MASTER
+    3  *&---------------------------------------------------------------------*
+    4  *       MODULE : Material Management                                   *
+    5  *----------------------------------------------------------------------*
+    6  *       Objective : VENDOR MASTER CREATE                               *
+    7  *       Program   : Updates Tables ( X )     Downloads data (  )       *
+    8  *                   Outputs List   (   )                               *
+    9  *                                                                      *
+   10  *                                                                      *
+   11  *       Date Created :    10.12.2025                                   *
+   12  *       Instructed by:    KPMG - Junaid Khan                           *
+   13  *       Devloped by:      KPMG - Jayprakash Tiwari                     *
+   14  *                                                                      *
+   15  *----------------------------------------------------------------------*
+   16  *       External Dependencies                                          *
+   17  *----------------------------------------------------------------------*
+   18  *                                                                      *
+   19  *----------------------------------------------------------------------*
+   20  * Amendment History                                                    *
+   21  *----------------------------------------------------------------------*
+   22  * Version Create/Change Owner     TR           CR/ID                   *
+   23  *......................................................................*
+   24  * <001>   Jayprakash Tiwari       DEVK900394                           *
+   25  * Reason: Mass vendor upload                                           *
+   26  *......................................................................*
+   27  * <002>                                                                *
+   28  * Reason:                                                              *
+   29  *----------------------------------------------------------------------*
+   30  REPORT zmm_vend_master.
+   31
+   32  INCLUDE zmm_vend_master_top.
+   33  INCLUDE zmm_vend_master_scr.
+   34  INCLUDE zmm_vend_master_cl.
+   35  INCLUDE zmm_vend_master_forms.
+   36
+   37  INITIALIZATION.
+   38    " Setting button text and optional icon
+   39    btn_tpl = '@49@ Download Template'.
+   40
+   41  AT SELECTION-SCREEN.
+   42    CASE sy-ucomm.
+   43      WHEN 'DTL'. " User-command assigned to the button
+   44        PERFORM download_template.
+   45    ENDCASE.
+   46
+   47  *&---------------------------------------------------------------------*
+   48  *&                    SEARCH HELP
+   49  *&---------------------------------------------------------------------*
+   50  AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_flname.
+   51    PERFORM value_request.
+        "VALUE REQUEST FOR FILE
+   52  *&---------------------------------------------------------------------*
+   53  *&     START OF SELECTION
+   54  *&---------------------------------------------------------------------*
+   55  START-OF-SELECTION.
+   56  ****  PERFORM validations.
+   57  *&---------------------------------------------------------------------*
+   58  *&     CREATE BUSINESS PARTNER
+   59  *&---------------------------------------------------------------------*
+   60  START-OF-SELECTION.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Program ZMM_VEND_MASTER                       Page      3
+--------------------------------------------------------------------------------
+
+   61  *BOC By Arnav on 21/07/2026
+   62  *  CLEAR : lv_flag.
+   63  *  PERFORM upload_excel.
+   64  *  IF rb_new = 'X'.
+   65  *    PERFORM convert_data_cr.
+   66  *    PERFORM create_bp_vendor.                        "CREATE BUSINESS P
+       ARTNER WITH VENDOR ROLES
+   67  *    IF t_log IS NOT INITIAL.
+   68  *      PERFORM download_log_to_excel. " Saves file first
+   69  *      PERFORM display_log.           " Then shows result on screen
+   70  *    ENDIF.
+   71  *  ELSEIF rb_ext = 'X'.
+   72  *    PERFORM convert_data_ex.
+   73  *    PERFORM extend_bp.
+   74  *    IF t_log_ex IS NOT INITIAL.
+   75  *      PERFORM download_log_to_excel_ex. " Saves file first
+   76  *      PERFORM display_log_ex.           " Then shows result on screen
+   77  *    ENDIF.
+   78  *****  ELSEIF rb_chg = 'X'.
+   79  *****    PERFORM convert_data_ex.
+   80  *****    PERFORM change_bp_vendor.
+   81  *  ENDIF.
+   82
+   83    CLEAR: lv_flag.
+   84    PERFORM upload_excel.
+   85
+   86    IF rb_new = 'X'.
+   87      PERFORM convert_data_cr.
+   88      PERFORM validate_create.          "FSD30 R4 - validate & de-dup, dro
+       p bad rows
+   89      PERFORM create_bp_vendor.
+   90      IF t_log IS NOT INITIAL.
+   91        PERFORM download_error_log_cr.  "FSD30 R1 - error-only download (n
+       o-op if none)
+   92        PERFORM display_log.
+   93      ENDIF.
+   94
+   95    ELSEIF rb_ext = 'X'.
+   96      PERFORM convert_data_ex.
+   97      PERFORM extend_bp.                "FSD30 R2 - now per-record, no har
+       d stop
+   98      IF t_log_ex IS NOT INITIAL.
+   99        PERFORM download_error_log_ex.  "FSD30 R1
+  100        PERFORM display_log_ex.
+  101      ENDIF.
+  102
+  103    ELSEIF rb_chg = 'X'.                "FSD30 R3 - CHANGE mode activated
+  104      PERFORM convert_data_ex.          "change file uses the extend templ
+       ate layout
+  105      PERFORM validate_change.          "FSD30 R4 - BP mandatory & must ex
+       ist
+  106      PERFORM extend_bp.                "shared maintain routine (change-a
+       ware)
+  107      IF t_log_ex IS NOT INITIAL.
+  108        PERFORM download_error_log_ex.  "FSD30 R1
+  109        PERFORM display_log_ex.
+  110      ENDIF.
+  111    ENDIF.
+  112  *BOC By Arnav on 21/07/2026
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_CL                    Page      4
+--------------------------------------------------------------------------------
+
+    1  *&---------------------------------------------------------------------*
+    2  *& Include          ZMM_VEND_MASTER_CL
+    3  *&---------------------------------------------------------------------*
+    4  *&---------------------------------------------------------------------*
+    5  *&                      CLASS DECLARATION
+    6  *&---------------------------------------------------------------------*
+    7  CLASS lcl_data DEFINITION.
+    8    PUBLIC SECTION.
+    9      METHODS: create_vendor_data.
+   10
+   11    PRIVATE SECTION.
+   12      METHODS: prepare_data
+   13        RETURNING VALUE(re_flag) TYPE i.
+   14  *   DATA DECLARATIONS
+   15      DATA: gs_vmds_extern   TYPE vmds_ei_main,
+   16            gs_succ_messages TYPE cvis_message,
+   17            gs_vmds_error    TYPE vmds_ei_main,
+   18            gs_err_messages  TYPE cvis_message,
+   19            gs_vmds_succ     TYPE vmds_ei_main,
+   20            gv_ktokk         TYPE ktokk,
+   21            gv_ccode         TYPE bukrs,
+   22            gv_akont         TYPE akont,
+   23            gv_name          TYPE name1.
+   24  ENDCLASS.                    "LCL_DATA
+   25  *----------------------------------------------------------------------*
+   26  *       CLASS LCL_DATA IMPLEMENTATION
+   27  *----------------------------------------------------------------------*
+   28  CLASS lcl_data IMPLEMENTATION.
+   29  *&---------------------------------------------------------------------*
+   30  *&  METHOD TO CREATE VENDOR DATA
+   31  *&---------------------------------------------------------------------*
+   32    METHOD create_vendor_data.
+   33  *   LOCAL DATA DECLARATION
+   34      DATA: lv_return TYPE i.
+   35  *   PREPARE THE DATA TO BE USED FOR VENDOR CREATION
+   36      lv_return =  me->prepare_data( ).
+   37  *   DO NOT PROCEED IF THE VENDOR DATA FOR CREATION WAS NOT PREPARED
+   38      IF lv_return IS NOT INITIAL.
+   39        EXIT.
+   40      ENDIF.
+   41  *   INITIALIZE ALL THE DATA
+   42      vmd_ei_api=>initialize( ).
+   43  *   CALL THE METHOD FOR CREATION OF VENDOR.
+   44      CALL METHOD vmd_ei_api=>maintain_bapi
+   45        EXPORTING
+   46          is_master_data           = gs_vmds_extern
+   47        IMPORTING
+   48          es_master_data_correct   = gs_vmds_succ
+   49          es_message_correct       = gs_succ_messages
+   50          es_master_data_defective = gs_vmds_error
+   51          es_message_defective     = gs_err_messages.
+   52
+   53      IF gs_err_messages-is_error IS INITIAL.
+   54        COMMIT WORK AND WAIT.
+   55      ELSE.
+   56        w_log-message = |{ w_log-message } Vendor BAPI Failed:|.
+   57        LOOP AT gs_err_messages-messages INTO DATA(wa_err).
+   58          w_log-message = |{ w_log-message } { wa_err-message };|.
+   59        ENDLOOP.
+   60      ENDIF.
+   61    ENDMETHOD.                    "CREATE_VENDOR_DATA
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_CL                    Page      5
+--------------------------------------------------------------------------------
+
+   62  *&---------------------------------------------------------------------*
+   63  *&  METHOD TO PREPARE DATA FOR VENDOR CREATION
+   64  *&---------------------------------------------------------------------*
+   65    METHOD prepare_data.
+   66      DATA: lt_contacts       TYPE vmds_ei_contacts_t,
+   67            ls_contacts       TYPE vmds_ei_contacts,
+   68            lt_vendors        TYPE vmds_ei_extern_t,
+   69            ls_vendors        TYPE vmds_ei_extern,
+   70            ls_address        TYPE cvis_ei_address1,
+   71            ls_addressdep     TYPE vmds_ei_central_addr,
+   72            lt_company        TYPE vmds_ei_company_t,
+   73            ls_company        TYPE vmds_ei_company,
+   74            whtax_t           TYPE vmds_ei_wtax_type_t,
+   75            whtax_s           TYPE vmds_ei_wtax_type,
+   76            ls_company_data   TYPE vmds_ei_vmd_company,
+   77            ls_purchas_data   TYPE vmds_ei_vmd_purchasing,
+   78            lt_purchasing     TYPE vmds_ei_purchasing_t,
+   79            lt_purchasing2    TYPE vmds_ei_purchasing2_t,
+   80            ls_purchasing     TYPE vmds_ei_purchasing,
+   81            ls_purchasing2    TYPE vmds_ei_purchasing2_s,
+   82            lt_purch_func     TYPE vmds_ei_functions_t,
+   83            ls_purch_func     TYPE vmds_ei_functions,
+   84            ls_purch_fun_data TYPE vmds_ei_vmd_functions,
+   85            ls_message        TYPE cvis_message,
+   86            lv_contactid      TYPE bapicontact_01-contact,
+   87            l_ktokk           TYPE ktokk,
+   88            ls_lfa1           TYPE vmds_lfa1_s.
+   89
+   90      DATA: lv_date_frmc     TYPE dats,
+   91            lv_date_toc      TYPE dats,
+   92            lv_file_frm_date TYPE string,
+   93            lv_file_to_date  TYPE string.
+   94
+   95      DATA: iv_ktokd TYPE ktokd,
+   96            et_parvw TYPE cmds_parvw_t.
+   97
+   98      DATA: lv_date_con  TYPE dats,
+   99            lv_file_date TYPE string.
+  100
+  101      wa_file-bpartner = |{ wa_file-bpartner ALPHA = IN }|.
+  102
+  103      CLEAR: gs_vmds_extern.
+  104
+  105      ls_vendors-header-object_instance-lifnr = |{ lfa1-lifnr ALPHA = IN }
+       |.
+  106      ls_vendors-header-object_task = 'U'.
+  107
+  108      ls_addressdep-data-bahns = wa_file-bahns.
+  109      ls_addressdep-datax-bahns = abap_true.
+  110      APPEND ls_addressdep TO ls_vendors-central_data-central-central_addr
+       essdep-addressdep.
+  111
+  112      ls_vendors-central_data-central = VALUE #(
+  113        data = VALUE #(
+  114          stenr     = wa_file-stenr
+  115          profs     = wa_file-profs
+  116          bahns     = wa_file-bahns
+  117          j_1kftind = wa_file-j_1kftind
+  118          j_1kftbus = wa_file-j_1kftbus
+  119        )
+  120        datax = VALUE #(
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_CL                    Page      6
+--------------------------------------------------------------------------------
+
+  121          stenr     = 'X'
+  122          profs     = 'X'
+  123          bahns     = 'X'
+  124          j_1kftind = 'X'
+  125          j_1kftbus = 'X'
+  126        )
+  127      ).
+  128
+  129      ls_vendors-central_data-address = VALUE #(
+  130        task = 'U'
+  131        postal = VALUE #(
+  132          data = VALUE #(
+  133            name    = lfa1-name1
+  134            country = lfa1-land1
+  135          )
+  136          datax = VALUE #(
+  137            name    = 'X'
+  138            country = 'X'
+  139          )
+  140        )
+  141      ).
+  142  *&---------------------------------------------------------------------*
+  143  *&  *   SET THE COMPANY CODE AND GL ACCOUNT
+  144  *&---------------------------------------------------------------------*
+  145      IF wa_file-bukrs IS NOT INITIAL.
+  146        CLEAR w_lfa1.
+  147
+  148        READ TABLE t_lfa1 INTO w_lfa1 WITH KEY lifnr = lfa1-lifnr.
+  149        IF sy-subrc = 0.
+  150          l_ktokk = w_lfa1-ktokk.
+  151        ENDIF.
+  152
+  153        ls_company = VALUE #(
+  154          task       = 'M'
+  155          data_key   = VALUE #( bukrs = wa_file-bukrs )
+  156          data       = VALUE #(
+  157            akont    = |{ wa_file-akont ALPHA = IN }| " Inline Alpha Conve
+       rsion
+  158            zuawa    = wa_file-zuawa
+  159            altkn    = wa_file-altkn
+  160            " Date conversion using functional style/string templates
+  161            cerdt    = COND #( WHEN wa_file-cerdt IS NOT INITIAL THEN |{ w
+       a_file-cerdt+6(4) }{ wa_file-cerdt+3(2) }{ wa_file-cerdt+0(2) }| ELSE ''
+        )
+  162            reprf    = wa_file-reprf
+  163            zterm    = wa_file-zterm
+  164            kverm    = wa_file-kverm
+  165            hbkid    = wa_file-hbkid
+  166            mindk    = wa_file-mindk
+  167            zwels    = wa_file-paymethod
+  168          )
+  169          datax      = VALUE #(
+  170            zterm    = 'X' akont = 'X' zuawa = 'X' altkn = 'X'
+  171            reprf    = 'X' kverm = 'X' hbkid = 'X' mindk = 'X'
+  172            zwels    = 'X'
+  173          )
+  174        ).
+  175        IF wa_file-srno IS NOT INITIAL.
+  176          LOOP AT it_file_all INTO DATA(wa_file_all) WHERE srno = wa_file-
+       srno.
+  177            whtax_s-task  = 'M'.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_CL                    Page      7
+--------------------------------------------------------------------------------
+
+  178            whtax_s-data_key-witht  = wa_file_all-witht.
+  179            whtax_s-data-wt_withcd  = wa_file_all-wt_withcd.
+  180            whtax_s-data-wt_subjct  = wa_file_all-wt_subjct.
+  181            whtax_s-data-wt_wtstcd  = wa_file_all-wt_wtstcd.
+  182            whtax_s-data-wt_exnr    = wa_file_all-wt_exnr  .
+  183            whtax_s-data-wt_exrt    = wa_file_all-wt_exrt.
+  184
+  185            IF wa_file_all-wt_exdf IS NOT INITIAL.
+  186              lv_file_frm_date = wa_file_all-wt_exdf.
+  187              lv_date_frmc = lv_file_frm_date+6(4) && lv_file_frm_date+3(2
+       ) && lv_file_frm_date+0(2).
+  188            ENDIF.
+  189            IF wa_file_all-wt_exdt IS NOT INITIAL.
+  190              lv_file_to_date = wa_file_all-wt_exdt .
+  191              lv_date_toc = lv_file_to_date+6(4) && lv_file_to_date+3(2) &
+       & lv_file_to_date+0(2).
+  192            ENDIF.
+  193
+  194            whtax_s-data-wt_exdf    = lv_date_frmc.
+  195            whtax_s-data-wt_exdt    = lv_date_toc .
+  196            whtax_s-data-wt_wtexrs  = wa_file_all-wt_wtexrs.
+  197            whtax_s-data-qsrec      = wa_file_all-qsrec.
+  198
+  199            whtax_s-datax-wt_withcd  = abap_true.
+  200            whtax_s-datax-wt_subjct  = abap_true.
+  201            whtax_s-datax-wt_wtstcd  = abap_true.
+  202            whtax_s-datax-wt_exnr    = abap_true.
+  203            whtax_s-datax-wt_exrt    = abap_true.
+  204            whtax_s-datax-wt_exdf    = abap_true.
+  205            whtax_s-datax-wt_exdt    = abap_true.
+  206            whtax_s-datax-wt_wtexrs  = abap_true.
+  207            whtax_s-datax-qsrec      = abap_true.
+  208
+  209            APPEND whtax_s TO whtax_t.
+  210            CLEAR: whtax_s, wa_file_all.
+  211          ENDLOOP.
+  212
+  213          ls_company-wtax_type-wtax_type = whtax_t.
+  214        ENDIF.
+  215
+  216        APPEND ls_company TO ls_vendors-company_data-company.
+  217      ENDIF.
+  218  *&---------------------------------------------------------------------*
+  219  *&  *   SET THE PURCHASING DATA
+  220  *&---------------------------------------------------------------------*
+  221      IF wa_file-ekorg IS NOT INITIAL.
+  222        vmd_ei_api_check=>get_mand_partner_functions(
+  223          EXPORTING iv_ktokk = w_lfa1-ktokk
+  224          IMPORTING et_parvw = et_parvw
+  225        ).
+  226
+  227        DATA: lt_existing_wyt3 TYPE TABLE OF wyt3.
+  228        SELECT * FROM wyt3
+  229          INTO TABLE lt_existing_wyt3
+  230          WHERE lifnr = w_lfa1-lifnr
+  231            AND ekorg = wa_file-ekorg.
+  232
+  233        ls_purchasing = VALUE #(
+  234          task     = 'M'
+  235          data_key = VALUE #( ekorg = wa_file-ekorg )
+  236          data     = VALUE #(
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_CL                    Page      8
+--------------------------------------------------------------------------------
+
+  237            waers   = wa_file-waers
+  238            zterm   = wa_file-zterm_org
+  239            verkf   = wa_file-verkf
+  240            telf1   = wa_file-telf1
+  241            ekgrp   = wa_file-ekgrp
+  242            kalsk   = wa_file-kalsk
+  243            lebre   = wa_file-lebre
+  244            kzaut   = wa_file-kzaut
+  245            inco1   = wa_file-inco1
+  246            inco2_l = wa_file-inco1_l
+  247            inco2   = wa_file-inco2
+  248            inco3_l = wa_file-inco2_l
+  249            webre   = wa_file-webre
+  250            lfabc   = wa_file-lfabc
+  251          )
+  252          datax    = VALUE #(
+  253            waers = 'X' zterm = 'X' verkf = 'X' telf1 = 'X' ekgrp = 'X'
+  254            kalsk = 'X' lebre = 'X' kzaut = 'X' inco1 = 'X' inco2_l = 'X'
+  255            inco2 = 'X' inco3_l = 'X' webre = 'X'
+  256          )
+  257        ).
+  258
+  259        ls_purchasing-functions-functions = VALUE #( FOR wa IN et_parvw (
+  260            task     = COND #( WHEN line_exists( lt_existing_wyt3[ parvw =
+        wa-parvw ] )
+  261                       THEN 'U'
+  262                       ELSE 'I' )
+  263            data_key = VALUE #( parvw = wa-parvw )
+  264            data     = VALUE #( partner = w_lfa1-lifnr )
+  265            datax    = VALUE #( partner = 'X' )
+  266        ) ).
+  267
+  268        APPEND ls_purchasing TO ls_vendors-purchasing_data-purchasing.
+  269      ENDIF.
+  270
+  271      APPEND ls_vendors TO gs_vmds_extern-vendors.
+  272
+  273      MOVE wa_file-bpartner TO iv_partner.
+  274      IF rb_new = 'X' AND wa_file-bankl IS NOT INITIAL.
+  275        PERFORM upload_bank_to_bp.
+  276      ENDIF.
+  277    ENDMETHOD.                    "PREPARE_DATA
+  278  ENDCLASS.                    "LCL_DATA IMPLEMENTATION
+  279
+  280  DATA: lo_data TYPE REF TO lcl_data.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page      9
+--------------------------------------------------------------------------------
+
+    1  *&---------------------------------------------------------------------*
+    2  *& Include          ZMM_VEND_MASTER_FORMS
+    3  *&---------------------------------------------------------------------*
+    4  FORM download_template.
+    5    DATA: lv_filename  TYPE string,
+    6          lt_file_data TYPE TABLE OF string,
+    7          lv_header    TYPE string,
+    8          lv_fname     TYPE string,
+    9          lv_path      TYPE string,
+   10          lv_fpath     TYPE string,
+   11          lv_action    TYPE i.
+   12
+   13    " Add your specific field list here
+   14    DATA(lv_tab) = cl_abap_char_utilities=>horizontal_tab.
+   15
+   16    IF rb_new = 'X'.
+   17      lv_header = |Business Partner Number{ lv_tab }Partner Type{ lv_tab }
+       BP Grouping{ lv_tab }Title{ lv_tab }| &&
+   18                  |Name 1{ lv_tab }Name 2{ lv_tab }Name 3{ lv_tab }Name 4{
+        lv_tab }| &&
+   19                  |Old Vendor Code{ lv_tab }Search Term 1{ lv_tab }Search
+       Term 2{ lv_tab }BUILDING{ lv_tab }| &&
+   20                  |ROOMNUMBER{ lv_tab }FLOOR{ lv_tab }STREET{ lv_tab }STRE
+       ET1{ lv_tab }| &&
+   21                  |STREET2{ lv_tab }STREET3{ lv_tab }LOCATION{ lv_tab }DIS
+       TRICT{ lv_tab }| &&
+   22                  |HOME CITY{ lv_tab }Postal Code{ lv_tab }City{ lv_tab }C
+       ountry{ lv_tab }| &&
+   23                  |Region (General){ lv_tab }Telephone number{ lv_tab }Mob
+       ile number{ lv_tab }Fax Number{ lv_tab }| &&
+   24                  |Email 0{ lv_tab }Valid From{ lv_tab }Valid To{ lv_tab }
+       Partner Type{ lv_tab }| &&
+   25                  |Identification Category{ lv_tab }Identification Number{
+        lv_tab }ID From Date{ lv_tab }ID To Date{ lv_tab }| &&
+   26                  |Telephone no. 3{ lv_tab }Email 1{ lv_tab }Email 2{ lv_t
+       ab }Email 3{ lv_tab }| &&
+   27                  |Email 4{ lv_tab }Email 5{ lv_tab }Email 6{ lv_tab }J1I
+       Excise - Dep{ lv_tab }J1I Excise - Range{ lv_tab }J1I Excise - Division{
+        lv_tab }| &&
+   28                  |J1I Excise - District{ lv_tab }J1I Excise - Commissione
+       rate{ lv_tab }J1I Vendor Type{ lv_tab }Customer Number{ lv_tab }| &&
+   29                  |PAN{ lv_tab }Service Tax Registration{ lv_tab }BP Tax N
+       umber Category{ lv_tab }GST No.{ lv_tab }| &&
+   30                  |Vendor Class{ lv_tab }Industry Sector{ lv_tab }Time Zon
+       e{ lv_tab }Company Code{ lv_tab }| &&
+   31                  |Recon Account{ lv_tab }Sort Key{ lv_tab }Previous Accou
+       nt Number{ lv_tab }Minority Indicator{ lv_tab }| &&
+   32                  |Certification Date{ lv_tab }Payment Terms{ lv_tab }Doub
+       le Invoice Check{ lv_tab }Account Memo / Check Flag{ lv_tab }| &&
+   33                  |NEW: House Bank ID{ lv_tab }Purchasing Organization{ lv
+       _tab }Currency{ lv_tab }Payment Terms (Purchasing){ lv_tab }| &&
+   34                  |Responsible Salesperson{ lv_tab }Incoterms Part 1{ lv_t
+       ab }Incoterms Location 1{ lv_tab }Incoterms Part 2{ lv_tab }| &&
+   35                  |Incoterms Location 2{ lv_tab }GR-based IV{ lv_tab }Serv
+       ice-based IV{ lv_tab }Automatic PO Allowed{ lv_tab }| &&
+   36                  |ABC Indicator{ lv_tab }TAN Number{ lv_tab }MSME Number{
+        lv_tab }Type of Industry{ lv_tab }| &&
+   37                  |Type of Business{ lv_tab }Train Station (CIN){ lv_tab }
+       Supplier Telephone No.{ lv_tab }Purchasing Group{ lv_tab }| &&
+   38                  |Schema Group{ lv_tab }Partner Function (Purchasing over
+       ride){ lv_tab }Bank Country/Region Key{ lv_tab }BP Bank ID{ lv_tab }| &&
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     10
+--------------------------------------------------------------------------------
+
+   39                  |Bank Key{ lv_tab }Bank Account Number{ lv_tab }Remainin
+       g Bank Account No.{ lv_tab }Account Holder Name{ lv_tab }| &&
+   40                  |User-defined Bank Account Name{ lv_tab }Name of Financi
+       al Institution{ lv_tab }Bank Region{ lv_tab }Bank Street{ lv_tab }| &&
+   41                  |Bank City{ lv_tab }Branch{ lv_tab }Swift Code{ lv_tab }
+       Reason{ lv_tab }| &&
+   42                  |Vendor Number{ lv_tab }Flag{ lv_tab }WHT SRNO (group ke
+       y){ lv_tab }Withholding Tax Type{ lv_tab }| &&
+   43                  |Subject to WHT{ lv_tab }Type of Recipient{ lv_tab }WHT
+       Identification Number{ lv_tab }WHT Code{ lv_tab }| &&
+   44                  |Exemption Certificate Number{ lv_tab }Exemption Rate{ l
+       v_tab }Exemption From Date{ lv_tab }Exemption To Date{ lv_tab }| &&
+   45                  |Reason for Exemption{ lv_tab }Payment Method{ lv_tab }C
+       ontrol Key|.
+   46    ELSEIF rb_ext = 'X' OR rb_chg = 'X'.
+   47      lv_header = |Business Partner Number{ lv_tab }Company Code{ lv_tab }
+       Recon Account{ lv_tab }| &&
+   48                  |Sort Key{ lv_tab }Minority Indicator{ lv_tab }Certifica
+       tion Date{ lv_tab }| &&
+   49                  |Payment Terms{ lv_tab }Double Invoice Check{ lv_tab }Pu
+       rchasing Org{ lv_tab }| &&
+   50                  |Currency{ lv_tab }Responsible Salesperson{ lv_tab }Vend
+       or Tel{ lv_tab }| &&
+   51                  |Purchasing Group{ lv_tab }Schema Group| .
+   52    ENDIF.
+   53    APPEND lv_header TO lt_file_data.
+   54
+   55
+   56    " Open Save Dialog
+   57    lv_filename = |BP_Vend_Template_{ sy-datum }_{ sy-uzeit }|.
+   58
+   59    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+   60      EXPORTING
+   61        window_title      = 'Save Template As'
+   62        default_extension = 'XLS'
+   63        default_file_name = lv_filename
+   64        initial_directory = 'C:\'
+   65      CHANGING
+   66        filename          = lv_filename
+   67        path              = lv_path
+   68        fullpath          = lv_fpath
+   69        user_action       = lv_action.
+   70
+   71    CHECK lv_action = cl_gui_frontend_services=>action_ok.
+   72
+   73    " Download Header only (empty data table)
+   74    CALL FUNCTION 'GUI_DOWNLOAD'
+   75      EXPORTING
+   76        filename              = lv_fpath
+   77        filetype              = 'DAT'
+   78        write_field_separator = 'X' " Ensures Excel columns align
+   79      TABLES
+   80        data_tab              = lt_file_data.
+   81  ENDFORM.
+   82  *&---------------------------------------------------------------------*
+   83  *& Form VALUE_REQUEST
+   84  *&---------------------------------------------------------------------*
+   85  *& text
+   86  *&---------------------------------------------------------------------*
+   87  *& -->  p1        text
+   88  *& <--  p2        text
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     11
+--------------------------------------------------------------------------------
+
+   89  *&---------------------------------------------------------------------*
+   90  FORM value_request.
+   91    CALL FUNCTION 'F4_FILENAME'
+   92      EXPORTING
+   93        program_name = sy-cprog
+   94      IMPORTING
+   95        file_name    = p_flname.
+   96  ENDFORM.
+   97  *&---------------------------------------------------------------------*
+   98  *& Form UPLOAD_EXCEL
+   99  *&---------------------------------------------------------------------*
+  100  *& text
+  101  *&---------------------------------------------------------------------*
+  102  *& -->  p1        text
+  103  *& <--  p2        text
+  104  *&---------------------------------------------------------------------*
+  105  FORM upload_excel.
+  106    DATA: lv_fname   TYPE string.
+  107
+  108    lv_fname = p_flname.
+  109
+  110    CALL FUNCTION 'GUI_UPLOAD'
+  111      EXPORTING
+  112        filename                = lv_fname
+  113        filetype                = 'BIN'
+  114      IMPORTING
+  115        filelength              = gv_bin_len
+  116      TABLES
+  117        data_tab                = gt_raw
+  118      EXCEPTIONS
+  119        file_open_error         = 1
+  120        file_read_error         = 2
+  121        no_batch                = 3
+  122        gui_refuse_filetransfer = 4
+  123        invalid_type            = 5
+  124        no_authority            = 6
+  125        unknown_error           = 7
+  126        bad_data_format         = 8
+  127        header_not_allowed      = 9
+  128        separator_not_allowed   = 10
+  129        header_too_long         = 11
+  130        unknown_dp_error        = 12
+  131        access_denied           = 13
+  132        dp_out_of_memory        = 14
+  133        disk_full               = 15
+  134        dp_timeout              = 16
+  135        OTHERS                  = 17.
+  136  ENDFORM.
+  137  *&---------------------------------------------------------------------*
+  138  *& Form convert_data_cr
+  139  *&---------------------------------------------------------------------*
+  140  *& text
+  141  *&---------------------------------------------------------------------*
+  142  *& -->  p1        text
+  143  *& <--  p2        text
+  144  *&---------------------------------------------------------------------*
+  145  FORM convert_data_cr.
+  146    DATA: lv_xstring    TYPE xstring,
+  147          lo_excel      TYPE REF TO cl_fdt_xl_spreadsheet,
+  148          lv_docname    TYPE string,
+  149          lt_worksheets TYPE STANDARD TABLE OF string,
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     12
+--------------------------------------------------------------------------------
+
+  150          lv_worksheet  TYPE string,
+  151          lv_lines      TYPE i,
+  152          lo_data       TYPE REF TO data.
+  153
+  154    FIELD-SYMBOLS: <lt_data_bin>  TYPE STANDARD TABLE,
+  155                   <ls_data_bin>  TYPE any,
+  156                   <lv_value_bin> TYPE any,
+  157                   <lv_value>     TYPE any.
+  158
+  159    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+  160      EXPORTING
+  161        input_length = gv_bin_len
+  162      IMPORTING
+  163        buffer       = lv_xstring
+  164      TABLES
+  165        binary_tab   = gt_raw
+  166      EXCEPTIONS
+  167        failed       = 1
+  168        OTHERS       = 2.
+  169
+  170    CREATE OBJECT lo_excel
+  171      EXPORTING
+  172        document_name = lv_docname
+  173        xdocument     = lv_xstring.
+  174
+  175    IF lo_excel IS NOT INITIAL.
+  176      lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+  177        IMPORTING
+  178          worksheet_names = lt_worksheets ).
+  179    ENDIF.
+  180
+  181    DESCRIBE TABLE lt_worksheets LINES lv_lines.
+  182
+  183    IF lt_worksheets[] IS NOT INITIAL.
+  184      READ TABLE lt_worksheets INTO lv_worksheet INDEX lv_lines.
+  185      lo_data = lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+       lv_worksheet ).
+  186      ASSIGN lo_data->* TO <lt_data_bin>.
+  187    ENDIF.
+  188
+  189    IF <lt_data_bin> IS ASSIGNED.
+  190      LOOP AT <lt_data_bin> ASSIGNING <ls_data_bin> FROM 2.
+  191        CLEAR: wa_file.
+  192        DO.
+  193          ASSIGN COMPONENT sy-index OF STRUCTURE <ls_data_bin> TO <lv_valu
+       e_bin>.
+  194          IF sy-subrc EQ 0.
+  195            ASSIGN COMPONENT sy-index OF STRUCTURE wa_file TO <lv_value>.
+  196            IF sy-subrc EQ 0.
+  197              <lv_value> = <lv_value_bin>.
+  198            ENDIF.
+  199          ELSE.
+  200            EXIT.
+  201          ENDIF.
+  202        ENDDO.
+  203        IF wa_file IS NOT INITIAL.
+  204          APPEND wa_file TO it_file.
+  205        ENDIF.
+  206      ENDLOOP.
+  207    ENDIF.
+  208  ENDFORM.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     13
+--------------------------------------------------------------------------------
+
+  209  *&---------------------------------------------------------------------*
+  210  *& Form convert_data_ex
+  211  *&---------------------------------------------------------------------*
+  212  *& text
+  213  *&---------------------------------------------------------------------*
+  214  *& -->  p1        text
+  215  *& <--  p2        text
+  216  *&---------------------------------------------------------------------*
+  217  FORM convert_data_ex.
+  218    DATA: lv_xstring    TYPE xstring,
+  219          lo_excel      TYPE REF TO cl_fdt_xl_spreadsheet,
+  220          lv_docname    TYPE string,
+  221          lt_worksheets TYPE STANDARD TABLE OF string,
+  222          lv_worksheet  TYPE string,
+  223          lv_lines      TYPE i,
+  224          lo_data       TYPE REF TO data.
+  225
+  226    FIELD-SYMBOLS: <lt_data_bin>  TYPE STANDARD TABLE,
+  227                   <ls_data_bin>  TYPE any,
+  228                   <lv_value_bin> TYPE any,
+  229                   <lv_value>     TYPE any.
+  230
+  231    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+  232      EXPORTING
+  233        input_length = gv_bin_len
+  234      IMPORTING
+  235        buffer       = lv_xstring
+  236      TABLES
+  237        binary_tab   = gt_raw
+  238      EXCEPTIONS
+  239        failed       = 1
+  240        OTHERS       = 2.
+  241
+  242    CREATE OBJECT lo_excel
+  243      EXPORTING
+  244        document_name = lv_docname
+  245        xdocument     = lv_xstring.
+  246
+  247    IF lo_excel IS NOT INITIAL.
+  248      lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+  249        IMPORTING
+  250          worksheet_names = lt_worksheets ).
+  251    ENDIF.
+  252
+  253    DESCRIBE TABLE lt_worksheets LINES lv_lines.
+  254
+  255    IF lt_worksheets[] IS NOT INITIAL.
+  256      READ TABLE lt_worksheets INTO lv_worksheet INDEX lv_lines.
+  257      lo_data = lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+       lv_worksheet ).
+  258      ASSIGN lo_data->* TO <lt_data_bin>.
+  259    ENDIF.
+  260
+  261    IF <lt_data_bin> IS ASSIGNED.
+  262      LOOP AT <lt_data_bin> ASSIGNING <ls_data_bin> FROM 2.
+  263        CLEAR: wa_file_extend.
+  264        DO.
+  265          ASSIGN COMPONENT sy-index OF STRUCTURE <ls_data_bin> TO <lv_valu
+       e_bin>.
+  266          IF sy-subrc EQ 0.
+  267            ASSIGN COMPONENT sy-index OF STRUCTURE wa_file_extend TO <lv_v
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     14
+--------------------------------------------------------------------------------
+
+       alue>.
+  268            IF sy-subrc EQ 0.
+  269              <lv_value> = <lv_value_bin>.
+  270            ENDIF.
+  271          ELSE.
+  272            EXIT.
+  273          ENDIF.
+  274        ENDDO.
+  275        IF wa_file_extend IS NOT INITIAL.
+  276          APPEND wa_file_extend TO it_file_extend.
+  277        ENDIF.
+  278      ENDLOOP.
+  279    ENDIF.
+  280  ENDFORM.
+  281  *&---------------------------------------------------------------------*
+  282  *& Form CREATE_BP_VENDOR
+  283  *&---------------------------------------------------------------------*
+  284  *& text
+  285  *&---------------------------------------------------------------------*
+  286  *& -->  p1        text
+  287  *& <--  p2        text
+  288  *&---------------------------------------------------------------------*
+  289  FORM create_bp_vendor.
+  290  *  it_file_all[] = it_file[].
+  291  *  DELETE it_file WHERE bukrs IS INITIAL.
+  292
+  293  *     BASELINE (remove):
+  294  *         it_file_all[] = it_file[].
+  295  *         DELETE it_file WHERE bukrs IS INITIAL.
+  296  *     REPLACE WITH:
+  297        it_file_all[] = it_file[].
+  298  *     Keep every valid row; a missing company code is handled as a
+  299  *     warning during logging (below), not a silent delete.
+  300    LOOP AT it_file INTO wa_file.
+  301      CLEAR : businesspartnerextern,
+  302              partnercategory,
+  303              partnergroup,
+  304              centraldata,
+  305              centraldataperson,
+  306              centraldataorganization,
+  307              addressdata.
+  308      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+  309        EXPORTING
+  310          input  = wa_file-bpartner
+  311        IMPORTING
+  312          output = wa_file-bpartner.
+  313
+  314      partnercategory = wa_file-partn_cat.
+  315      partnergroup = wa_file-partn_grp.
+  316
+  317      CLEAR businesspartnerextern.
+  318
+  319      " Create General BP
+  320      PERFORM fill_central_data_vendor.
+  321      PERFORM fill_address_vendor.
+  322
+  323
+  324  *-- Begin of changes by Hemang for BP not getting created Req By: Om Pra
+       kash
+  325      " Check if BP exists
+  326      IF wa_file-bpartner IS NOT INITIAL.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     15
+--------------------------------------------------------------------------------
+
+  327        SELECT SINGLE partner FROM but000 INTO @DATA(lv_partner) WHERE par
+       tner = @wa_file-bpartner.
+  328        IF sy-subrc <> 0.
+  329          businesspartnerextern = wa_file-bpartner.
+  330        ELSE.
+  331          partner_change = abap_true.
+  332        ENDIF.
+  333      ENDIF.
+  334      IF lv_partner IS INITIAL AND ( wa_file-bpartner IS INITIAL OR wa_fil
+       e-bpartner IS NOT INITIAL ).
+  335        PERFORM call_bapi_bupa_create.
+  336      ELSE.
+  337        PERFORM call_bapi_bupa_central_change.
+  338      ENDIF.
+  339
+  340  *-- End of changes by Hemang for BP not getting created Req By: Om Praka
+       sh
+  341
+  342      IF businesspartner IS NOT INITIAL.
+  343        " Add Vendor Roles (FLVN00 for FI, FLVN01 for Purchasing)
+  344        PERFORM add_vendor_roles.
+  345
+  346        SELECT SINGLE link~vendor
+  347          FROM but000 AS bp
+  348          INNER JOIN cvi_vend_link AS link ON bp~partner_guid = link~partn
+       er_guid
+  349          WHERE bp~partner = @wa_file-bpartner
+  350          INTO @DATA(lv_vend_id).
+  351        IF sy-subrc = 0.
+  352          lv_vendor = lv_vend_id.
+  353          w_log-message = |{ w_log-message } Linked Vendor: { lv_vend_id }
+       .|.
+  354          SELECT SINGLE * FROM lfa1 WHERE lifnr = lv_vendor.
+  355          IF sy-subrc = 0.
+  356            wa_file-lifnr = lfa1-lifnr.
+  357          ENDIF.
+  358          SELECT SINGLE * FROM but020 WHERE partner = wa_file-bpartner.
+  359          REFRESH : t_lfa1[].
+  360          SELECT lifnr ktokk FROM lfa1 INTO TABLE t_lfa1 WHERE lifnr = lv_
+       vendor.
+  361
+  362          CREATE OBJECT lo_data.
+  363          CALL METHOD lo_data->create_vendor_data.
+  364        ENDIF.
+  365        SELECT SINGLE link~vendor
+  366          FROM but000 AS bp
+  367          INNER JOIN cvi_vend_link AS link ON bp~partner_guid = link~partn
+       er_guid
+  368          WHERE bp~partner = @wa_file-bpartner
+  369          INTO @lv_vend_id.
+  370        IF lv_vend_id IS NOT INITIAL.
+  371          IF partner_change IS INITIAL.
+  372            UPDATE lfa1 SET ven_class = wa_file-ven_class
+  373                        j_1ipanno = wa_file-j_1ipanno
+  374                        j_1iexcd  = wa_file-j_1iexcd
+  375                        j_1iexrn  = wa_file-j_1iexrn
+  376                        j_1iexrg  = wa_file-j_1iexrg
+  377                        j_1iexdi  = wa_file-j_1iexdi
+  378                        j_1iexco  = wa_file-j_1iexco
+  379                        j_1ivtyp  = wa_file-j_1ivtyp
+  380                        j_1isern  = wa_file-j_1isern
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     16
+--------------------------------------------------------------------------------
+
+  381                        j_1kftbus = wa_file-j_1kftbus     " J Newly Added
+  382                        j_1kftind = wa_file-j_1kftind     " J Newly Added
+  383                        bahns     = wa_file-bahns         " J Newly Added
+  384                        stenr     = wa_file-stenr         " J Newly Added
+  385                        profs     = wa_file-profs
+  386                           WHERE lifnr = lv_vendor.
+  387            COMMIT WORK AND WAIT.
+  388            w_log-message = |{ w_log-message } LFA1 data modified. |.
+  389          ENDIF.
+  390        ENDIF.
+  391  *    ELSE.
+  392  *      w_log-message = |{ w_log-message } Vendor Creation Failed. |.
+  393  *    ENDIF.
+  394  *    APPEND w_log TO t_log.
+  395        ELSE.
+  396          w_log-message = |{ w_log-message }Vendor Creation Failed. |.
+  397        ENDIF.
+  398        "--- FSD30 R1 : classify the record status ---
+  399        w_log-rowno = sy-tabix.
+  400        IF businesspartner IS INITIAL.
+  401          w_log-msgty = 'E'.                       "creation failed
+  402        ELSE.
+  403          w_log-stat_cc = COND #( WHEN wa_file-bukrs IS INITIAL THEN 'W' E
+       LSE 'S' ).
+  404          w_log-stat_po = COND #( WHEN wa_file-ekorg IS INITIAL THEN 'W' E
+       LSE 'S' ).
+  405          " created OK; downgrade to W if a CC/PO view was expected but mi
+       ssing,
+  406          " or if the message text carries a Fail/Error note from extensio
+       n.
+  407          IF w_log-message CS 'Fail' OR w_log-message CS 'ERROR'
+  408             OR w_log-stat_cc = 'W' OR w_log-stat_po = 'W'.
+  409            w_log-msgty = 'W'.
+  410          ELSE.
+  411            w_log-msgty = 'S'.
+  412          ENDIF.
+  413        ENDIF.
+  414        APPEND w_log TO t_log.
+  415
+  416
+  417      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+  418      CALL FUNCTION 'BUFFER_REFRESH_ALL'.
+  419      CLEAR: lv_vend_id, businesspartner, wa_file, partner_change.
+  420    ENDLOOP.
+  421  ENDFORM.
+  422  FORM fill_central_data_vendor.
+  423    centraldata = VALUE #(
+  424      searchterm1        = wa_file-searchterm1
+  425      searchterm2        = wa_file-searchterm2
+  426      title_key          = wa_file-title
+  427      partnertype        = wa_file-partnertype
+  428      partnerlanguage    = 'E'
+  429      partnerlanguageiso = 'EN'
+  430    ).
+  431
+  432    centraldatax = CORRESPONDING #( centraldata ).
+  433
+  434    centraldataperson = COND #( WHEN partnercategory = 1
+  435                                THEN VALUE #( firstname = wa_file-name_fir
+       st
+  436                                              lastname  = wa_file-name_las
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     17
+--------------------------------------------------------------------------------
+
+       t
+  437                                              birthname = wa_file-name_las
+       t2
+  438                                              middlename = wa_file-name_mi
+       ddle
+  439                                              correspondlanguage = 'E'
+  440                                              correspondlanguageiso = 'EN'
+        ) ).
+  441
+  442    centraldataorganization = COND #( WHEN partnercategory = 2
+  443                                      THEN VALUE #( name1 = wa_file-name_f
+       irst
+  444                                                    name2 = wa_file-name_l
+       ast
+  445                                                    name3 = wa_file-name_l
+       ast2
+  446                                                    name4 = wa_file-name_m
+       iddle ) ).
+  447
+  448    centraldatagroup = COND #( WHEN partnercategory = 3
+  449                               THEN VALUE #( namegroup1 = wa_file-name_fir
+       st
+  450                                             namegroup2 = wa_file-name_las
+       t ) ).
+  451  ENDFORM.
+  452  FORM fill_address_vendor.
+  453    CLEAR: it_maildata[], it_faxdata[], it_telephondata[].
+  454
+  455    addressdata = VALUE #(
+  456      street      = wa_file-street
+  457      str_suppl1  = wa_file-str_suppl1
+  458      str_suppl2  = wa_file-str_suppl2
+  459      str_suppl3  = wa_file-str_suppl3
+  460      location    = wa_file-location
+  461      building    = wa_file-building
+  462      room_no     = wa_file-roomnumber
+  463      floor       = wa_file-floor
+  464      district    = wa_file-district
+  465      home_city   = wa_file-home_city
+  466      postl_cod1  = wa_file-postl_cod1
+  467      city        = wa_file-city
+  468      country     = wa_file-country
+  469      region      = wa_file-region
+  470      langu       = 'E'
+  471      languiso    = 'EN'
+  472      time_zone   = wa_file-time_zone
+  473      validfromdate = COND #( WHEN wa_file-valid_from IS NOT INITIAL
+  474                              THEN |{ wa_file-valid_from+6(4) }{ wa_file-v
+       alid_from+3(2) }{ wa_file-valid_from+0(2) }|
+  475                              ELSE '' )
+  476      validtodate   = COND #( WHEN wa_file-valid_to IS NOT INITIAL
+  477                              THEN |{ wa_file-valid_to+6(4) }{ wa_file-val
+       id_to+3(2) }{ wa_file-valid_to+0(2) }|
+  478                              ELSE '' )
+  479    ).
+  480
+  481    " Telephone Data
+  482    it_telephondata = VALUE #(
+  483      ( country = wa_file-country telephone = wa_file-mob_number std_no =
+       'X' r_3_user = '3' consnumber = '001' home_flag = 'X' )
+  484      ( country = wa_file-country telephone = wa_file-tel_number std_no =
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     18
+--------------------------------------------------------------------------------
+
+       'X' r_3_user = '1' consnumber = '002' home_flag = 'X' )
+  485    ).
+  486
+  487    " If second phone exists
+  488    IF wa_file-tel_number_3 IS NOT INITIAL.
+  489      it_telephondata = VALUE #( BASE it_telephondata
+  490        ( country = wa_file-country telephone = wa_file-tel_number_3 std_n
+       o = 'X' r_3_user = '1' consnumber = '003' home_flag = 'X' )
+  491      ).
+  492    ENDIF.
+  493
+  494    " Compact Email and Fax assignment
+  495    it_faxdata  = VALUE #( ( fax = wa_file-fax ) ).
+  496    it_maildata = VALUE #( ( e_mail = wa_file-smtp_addr std_no = 'X' std_r
+       ecip = 'X' home_flag = 'X' consnumber = '001' ) ).
+  497
+  498    IF wa_file-email_1 IS NOT INITIAL.
+  499      it_maildata = VALUE #( BASE it_maildata
+  500        ( e_mail = wa_file-email_1 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  501      ).
+  502    ENDIF.
+  503    IF wa_file-email_2 IS NOT INITIAL.
+  504      it_maildata = VALUE #( BASE it_maildata
+  505        ( e_mail = wa_file-email_2 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  506      ).
+  507    ENDIF.
+  508    IF wa_file-email_3 IS NOT INITIAL.
+  509      it_maildata = VALUE #( BASE it_maildata
+  510        ( e_mail = wa_file-email_3 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  511      ).
+  512    ENDIF.
+  513    IF wa_file-email_4 IS NOT INITIAL.
+  514      it_maildata = VALUE #( BASE it_maildata
+  515        ( e_mail = wa_file-email_4 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  516      ).
+  517    ENDIF.
+  518    IF wa_file-email_5 IS NOT INITIAL.
+  519      it_maildata = VALUE #( BASE it_maildata
+  520        ( e_mail = wa_file-email_5 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  521      ).
+  522    ENDIF.
+  523    IF wa_file-email_6 IS NOT INITIAL.
+  524      it_maildata = VALUE #( BASE it_maildata
+  525        ( e_mail = wa_file-email_6 std_no = 'X' std_recip = 'X' home_flag
+       = 'X' consnumber = '002' )
+  526      ).
+  527    ENDIF.
+  528
+  529  ENDFORM.
+  530  *&---------------------------------------------------------------------*
+  531  *& Form CALL_BAPI_BUPA_CREATE
+  532  *&---------------------------------------------------------------------*
+  533  *& text
+  534  *&---------------------------------------------------------------------*
+  535  *& -->  p1        text
+  536  *& <--  p2        text
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     19
+--------------------------------------------------------------------------------
+
+  537  *&---------------------------------------------------------------------*
+  538  FORM call_bapi_bupa_create .
+  539
+  540    CLEAR businesspartner.
+  541    CALL FUNCTION 'BAPI_BUPA_CREATE_FROM_DATA'
+  542      EXPORTING
+  543        businesspartnerextern   = businesspartnerextern
+  544        partnercategory         = partnercategory
+  545        partnergroup            = partnergroup
+  546        centraldata             = centraldata
+  547        centraldataperson       = centraldataperson
+  548        centraldataorganization = centraldataorganization
+  549        centraldatagroup        = centraldatagroup
+  550        addressdata             = addressdata
+  551      IMPORTING
+  552        businesspartner         = businesspartner
+  553      TABLES
+  554        telefondata             = it_telephondata
+  555        faxdata                 = it_faxdata
+  556        e_maildata              = it_maildata
+  557  ****      addressnotes            = it_addressnotes
+  558        return                  = return.
+  559
+  560    w_log = CORRESPONDING #( wa_file ).
+  561    w_log-bpartner = COND #( WHEN businesspartnerextern IS NOT INITIAL THE
+       N businesspartnerextern
+  562                             WHEN businesspartner IS NOT INITIAL THEN busi
+       nesspartner
+  563                             ELSE wa_file-bpartner ).
+  564    IF businesspartner IS NOT INITIAL.
+  565      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+  566        EXPORTING
+  567          wait = 'X'.
+  568
+  569      WAIT UP TO 2 SECONDS.
+  570
+  571      IF wa_file-stcd3 IS NOT INITIAL AND wa_file-taxtype IS NOT INITIAL.
+  572        MODIFY dfkkbptaxnum FROM @( VALUE #(
+  573            client   = sy-mandt
+  574            partner  = w_log-bpartner
+  575            taxtype  = wa_file-taxtype
+  576            taxnum   = wa_file-stcd3
+  577            taxnumxl = ''
+  578        ) ).
+  579
+  580        IF sy-subrc = 0.
+  581          COMMIT WORK.
+  582          w_log-message = 'BP VENDOR CREATED/UPDATED: TAX UPDATED'.
+  583        ELSE.
+  584          w_log-message = 'BP VENDOR CREATED/UPDATED: TAX TABLE MODIFY FAI
+       LED'.
+  585        ENDIF.
+  586      ELSE.
+  587        w_log-message = 'BP VENDOR CREATED/UPDATED: TAX NUMBER MISSING IN
+       FILE'.
+  588      ENDIF.
+  589    ENDIF.
+  590    IF line_exists( return[ type = 'E' ] ).
+  591      w_log-message = |{ w_log-message } / ERRORS: | &&
+  592                      REDUCE string( INIT m = ``
+  593                          FOR wa IN return WHERE ( type = 'E' )
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     20
+--------------------------------------------------------------------------------
+
+  594                          NEXT m = COND #( WHEN m = `` THEN wa-message
+  595                                           ELSE |{ m }; { wa-message }| )
+       ).
+  596    ENDIF.
+  597
+  598    IF businesspartnerextern IS NOT INITIAL.
+  599      businesspartner =  businesspartnerextern.
+  600    ENDIF.
+  601  ENDFORM.
+  602  FORM add_vendor_roles.
+  603    DATA: businesspartnerrole TYPE bapibus1006_bproles-partnerrole,
+  604          lv_role_status      TYPE string.
+  605    " FLVN00: FI Vendor (Company Code Data)
+  606    " FLVN01: Supplier (Purchasing Data)
+  607
+  608    REFRESH: return.
+  609
+  610    LOOP AT VALUE char10_t( ( 'FLVN00' ) ( 'FLVN01' ) ) INTO DATA(lv_role)
+       .
+  611      businesspartnerrole = lv_role.
+  612      CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
+  613        EXPORTING
+  614          businesspartner     = businesspartner
+  615          businesspartnerrole = businesspartnerrole
+  616          validfromdate       = sy-datum
+  617          validuntildate      = '99991231'
+  618        TABLES
+  619          return              = return.
+  620      IF NOT line_exists( return[ type = 'E' ] ).
+  621        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+  622        lv_role_status = |{ lv_role_status }{ lv_role } Added. |.
+  623      ELSE.
+  624        lv_role_status = |{ lv_role_status }{ lv_role } Fail: { return[ ty
+       pe = 'E' ]-message }. |.
+  625      ENDIF.
+  626      CLEAR: businesspartnerrole.
+  627    ENDLOOP.
+  628
+  629    w_log-message = |{ w_log-message } Roles: { lv_role_status }|.
+  630    IF wa_file-isec IS NOT INITIAL.
+  631      industrysector = wa_file-isec.
+  632      industrysectorkeysystem = '0001'.
+  633      defaultindustry = ''.
+  634
+  635      CALL FUNCTION 'BAPI_INDUSTRYSECTOR_ADD'
+  636        EXPORTING
+  637          businesspartner         = businesspartner
+  638          industrysectorkeysystem = industrysectorkeysystem
+  639          industrysector          = industrysector
+  640          defaultindustry         = defaultindustry
+  641        TABLES
+  642          return                  = return.
+  643
+  644      IF line_exists( return[ type = 'E' ] ) OR line_exists( return[ type
+       = 'A' ] ).
+  645        w_log-message = |{ w_log-message } Industry Add Failed: | &&
+  646                      REDUCE string( INIT m = ``
+  647                          FOR wa IN return WHERE ( type = 'E' OR type = 'A
+       ' )
+  648                          NEXT m = COND #( WHEN m = `` THEN wa-message
+  649                                           ELSE |{ m }; { wa-message }| )
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     21
+--------------------------------------------------------------------------------
+
+       ).
+  650      ELSE.
+  651        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+  652        w_log-message = |{ w_log-message } Industry Sector { industrysecto
+       r } Added.|.
+  653      ENDIF.
+  654    ENDIF.
+  655
+  656    REFRESH: return.
+  657
+  658    IF wa_file-identificationcategory IS NOT INITIAL AND wa_file-identific
+       ationnumber IS NOT INITIAL.
+  659      DATA: lv_id_from_date TYPE dats,
+  660            lv_id_to_date   TYPE dats.
+  661
+  662      " Convert Dates to Internal Format
+  663      IF wa_file-id_from_date IS NOT INITIAL.
+  664        CALL FUNCTION 'CONVERT_DATE_TO_INTERNAL'
+  665          EXPORTING
+  666            date_external = wa_file-id_from_date
+  667          IMPORTING
+  668            date_internal = lv_id_from_date
+  669          EXCEPTIONS
+  670            OTHERS        = 0.
+  671      ENDIF.
+  672
+  673      IF wa_file-id_to_date IS NOT INITIAL.
+  674        CALL FUNCTION 'CONVERT_DATE_TO_INTERNAL'
+  675          EXPORTING
+  676            date_external = wa_file-id_to_date
+  677          IMPORTING
+  678            date_internal = lv_id_to_date
+  679          EXCEPTIONS
+  680            OTHERS        = 0.
+  681      ENDIF.
+  682
+  683      CALL FUNCTION 'BAPI_IDENTIFICATION_ADD'
+  684        EXPORTING
+  685          businesspartner        = businesspartner
+  686          identificationcategory = CONV bu_id_category( wa_file-identifica
+       tioncategory )
+  687          identificationnumber   = CONV bu_id_number( wa_file-identificati
+       onnumber )
+  688          identification         = VALUE bapibus1006_identification(
+  689                                     identrydate      = sy-datum
+  690                                     idvalidfromdate  = lv_id_from_date
+  691                                     idvalidtodate    = lv_id_to_date )
+  692        TABLES
+  693          return                 = return.
+  694
+  695      " Log only Errors using REDUCE
+  696      IF line_exists( return[ type = 'E' ] ) OR line_exists( return[ type
+       = 'A' ] ).
+  697        w_log-message = |{ w_log-message } ID { wa_file-identificationnumb
+       er } Error: | &&
+  698                        REDUCE string( INIT m = ``
+  699                            FOR wa IN return WHERE ( type = 'E' OR type =
+       'A' )
+  700                            NEXT m = COND #( WHEN m = `` THEN wa-message
+  701                                             ELSE |{ m }; { wa-message }|
+       ) ).
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     22
+--------------------------------------------------------------------------------
+
+  702      ELSE.
+  703        " Commit and Wait to finalize BP buffer synchronization
+  704        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+  705        w_log-message = |{ w_log-message } ID { wa_file-identificationnumb
+       er } Added. |.
+  706      ENDIF.
+  707
+  708      CLEAR: lv_id_from_date, lv_id_to_date, return.
+  709    ENDIF.
+  710
+  711    iv_partner = |{ businesspartner ALPHA = IN }|.
+  712    wa_file-bpartner = iv_partner.
+  713  ENDFORM.
+  714  *&---------------------------------------------------------------------*
+  715  *& Form UPLOAD_BANK_TO_BP
+  716  *&---------------------------------------------------------------------*
+  717  *& text
+  718  *&---------------------------------------------------------------------*
+  719  *& -->  p1        text
+  720  *& <--  p2        text
+  721  *&---------------------------------------------------------------------*
+  722  FORM upload_bank_to_bp .
+  723    DATA: et_return    TYPE TABLE OF bapiret2,
+  724          et_bank      TYPE STANDARD TABLE OF bapibus1006_bankdetails,
+  725          et_return1   TYPE STANDARD TABLE OF bapiret2,
+  726          ls_bnka_ret  TYPE bapiret2,
+  727          lv_bank_temp TYPE c LENGTH 10.
+  728
+  729    CLEAR iv_partner.
+  730
+  731    iv_partner = |{ wa_file-bpartner ALPHA = IN }|.
+  732
+  733    " Handle Bank Master Data (bnka)
+  734    SELECT SINGLE bankl FROM bnka INTO @DATA(lv_exists)
+  735      WHERE banks = @wa_file-banks AND bankl = @wa_file-bankl.
+  736
+  737    IF sy-subrc <> 0.
+  738      " Use BAPI instead of direct INSERT BNKA
+  739      CALL FUNCTION 'BAPI_BANK_CREATE'
+  740        EXPORTING
+  741          bank_ctry    = wa_file-banks                    "++field name ch
+       anges by Hemang Req By: Om Prakash on 25/02/2026
+  742          bank_key     = wa_file-bankl
+  743          bank_address = VALUE  bapi1011_address(
+  744                          bank_name   = wa_file-banka
+  745                          swift_code  = wa_file-swift
+  746                          region      = wa_file-region_1
+  747                          street      = wa_file-street_1
+  748                          city        = wa_file-city_1
+  749                          bank_branch = wa_file-brnch )
+  750        IMPORTING
+  751          return       = ls_bnka_ret.
+  752      IF ls_bnka_ret-type <> 'E'.
+  753        COMMIT WORK AND WAIT. " Ensure BNKA is available for the next step
+  754        w_log-message = |{ w_log-message } BNKA Created.|.
+  755      ELSE.
+  756        w_log-message = |{ w_log-message } ERROR creating BNKA: { ls_bnka_
+       ret-message }|.
+  757      ENDIF.
+  758    ELSE.
+  759      " Update existing Bank Master using standard SQL if details changed
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     23
+--------------------------------------------------------------------------------
+
+  760      UPDATE bnka SET provz = @wa_file-region_1, stras = @wa_file-street_1
+       ,
+  761                      ort01 = @wa_file-city_1, brnch = @wa_file-brnch,
+  762                      banka = @wa_file-banka, swift = @wa_file-swift
+  763      WHERE banks = @wa_file-banks AND bankl = @wa_file-bankl.
+  764
+  765      COMMIT WORK AND WAIT.
+  766      w_log-message = |{ w_log-message } BNKA Updated.|.
+  767    ENDIF.
+  768
+  769    DATA(lv_bank_id) = wa_file-bank_id.
+  770
+  771    IF lv_bank_id IS INITIAL.
+  772      CALL FUNCTION 'BUPA_BANKDETAILS_GET'
+  773        EXPORTING
+  774          iv_partner     = iv_partner
+  775          iv_valid_date  = sy-datlo
+  776        TABLES
+  777          et_bankdetails = et_bank
+  778          et_return      = et_return1.
+  779
+  780      lv_bank_temp = lines( et_bank ) + 1.
+  781      lv_bank_id = |{ lv_bank_temp ALPHA = IN }|.
+  782    ENDIF.
+  783
+  784    CALL FUNCTION 'BUPA_BANKDETAIL_ADD'
+  785      EXPORTING
+  786        iv_partner    = iv_partner
+  787        iv_bkvid      = CONV bu_bkvid( lv_bank_id )
+  788        is_bankdetail = VALUE bapibus1006_bankdetail(
+  789                          bank_ctry = wa_file-banks
+  790                          bank_key  = wa_file-bankl
+  791                          bank_acct = wa_file-bankn
+  792                          accountholder = wa_file-koinh
+  793                          bank_ref  = wa_file-bkref
+  794                          ctrl_key  = wa_file-controlkey
+  795                          bankaccountname = wa_file-ebpp_accname )
+  796      TABLES
+  797        et_return     = et_return.
+  798
+  799    IF NOT line_exists( et_return[ type = 'E' ] ).
+  800      COMMIT WORK AND WAIT.
+  801      w_log-message = |{ w_log-message } Bank Details (ID: { lv_bank_id })
+        Added/Updated.|.
+  802    ELSE.
+  803      w_log-message = |{ w_log-message } Bank Add Failed: | &&
+  804                      REDUCE string( INIT m = ``
+  805                          FOR wa IN et_return WHERE ( type = 'E' )
+  806                          NEXT m = COND #( WHEN m = `` THEN wa-message
+  807                                           ELSE |{ m }; { wa-message }| )
+       ).
+  808    ENDIF.
+  809  ENDFORM.
+  810  *&---------------------------------------------------------------------*
+  811  *& Form extend_bp
+  812  *&---------------------------------------------------------------------*
+  813  *& text
+  814  *&---------------------------------------------------------------------*
+  815  *& -->  p1        text
+  816  *& <--  p2        text
+  817  *&---------------------------------------------------------------------*
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     24
+--------------------------------------------------------------------------------
+
+  818  *FORM extend_bp .
+  819  *  LOOP AT it_file_extend INTO wa_file_extend.
+  820  *    CLEAR w_log_ex.
+  821  *    MOVE-CORRESPONDING wa_file_extend TO w_log_ex.
+  822  *    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+  823  *      EXPORTING
+  824  *        input  = wa_file_extend-bpartner
+  825  *      IMPORTING
+  826  *        output = wa_file_extend-bpartner.
+  827  *    SELECT SINGLE partner  FROM but000 INTO l_partner WHERE partner =
+       wa_file_extend-bpartner.
+  828  *    IF sy-subrc = 0.
+  829  *      businesspartner = wa_file_extend-bpartner.
+  830  *      SELECT SINGLE * FROM but000 INTO wa_but000 WHERE partner = wa_fil
+       e_extend-bpartner AND partner_guid NE ''.
+  831  *      IF sy-subrc = 0.
+  832  *        SELECT SINGLE vendor FROM cvi_vend_link INTO lv_vendor
+  833  *               WHERE partner_guid = wa_but000-partner_guid.
+  834  *        IF sy-subrc = 0.
+  835  *          SELECT SINGLE * FROM lfa1 WHERE lifnr = lv_vendor.
+  836  *          REFRESH : t_lfa1[].
+  837  *          SELECT lifnr ktokk FROM lfa1 INTO TABLE t_lfa1 WHERE lifnr =
+       lv_vendor.
+  838  *        ENDIF.
+  839  *      ENDIF.
+  840  *
+  841  *      ls_vendors-header-object_instance-lifnr = lv_vendor.
+  842  *      ls_vendors-header-object_task = 'U'.
+  843  *
+  844  *      IF wa_file_extend-bukrs IS NOT INITIAL.
+  845  *        REFRESH: lt_company[].
+  846  *        CLEAR ls_company.
+  847  *        ls_company-task                    = 'M'.
+  848  *        ls_company-data_key-bukrs  = wa_file_extend-bukrs.
+  849  *        CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+  850  *          EXPORTING
+  851  *            input  = wa_file_extend-akont
+  852  *          IMPORTING
+  853  *            output = ls_company-data-akont.
+  854  *        ls_company-data-zterm        = wa_file_extend-zterm.
+  855  *        ls_company-datax-akont       = 'X'.
+  856  *        ls_company-datax-zterm      = 'X'.
+  857  *        ls_company-data-zuawa = wa_file_extend-zuawa. " sort key
+  858  *        ls_company-datax-zuawa = 'X'.
+  859  *        ls_company-data-mindk = wa_file_extend-mindk.
+  860  *        ls_company-datax-mindk = 'X'.
+  861  *        ls_company-data-cerdt  = COND #( WHEN wa_file-cerdt IS NOT INIT
+       IAL THEN |{ wa_file-cerdt+6(4) }{ wa_file-cerdt+3(2) }{ wa_file-cerdt+0(
+       2) }| ELSE '' ).
+  862  *        ls_company-datax-cerdt = 'X'.
+  863  *        ls_company-data-reprf = wa_file_extend-reprf.
+  864  *        ls_company-datax-reprf = 'X'.
+  865  *
+  866  *        APPEND ls_company TO ls_vendors-company_data-company.
+  867  *
+  868  *      ENDIF.
+  869  *
+  870  *      IF wa_file_extend-ekorg IS NOT INITIAL.
+  871  *        REFRESH: et_parvw[], lt_purchasing[].
+  872  *        CLEAR: ls_purchasing.
+  873  *        ls_purchasing-task                   = 'M'.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     25
+--------------------------------------------------------------------------------
+
+  874  *        ls_purchasing-data_key-ekorg = wa_file_extend-ekorg.
+                          "PURCHASING ORGANIZATION
+  875  *        ls_purchasing-data-waers = wa_file_extend-waers.
+  876  *        ls_purchasing-datax-waers = 'X'.
+  877  *
+  878  *        ls_purchasing-data-zterm = wa_file_extend-zterm.
+  879  *        ls_purchasing-datax-zterm = 'X'.
+  880  *        " ADDED BY KEDAR SUBRAT ON 03/08/2018 FOR SALES PERSON AND TELE
+       PHONE NUMBER UPDATE
+  881  *        ls_purchasing-data-verkf = wa_file_extend-verkf.
+  882  *        ls_purchasing-datax-verkf = 'X'.
+  883  *
+  884  *        ls_purchasing-data-telf1 = wa_file_extend-telf1.
+  885  *        ls_purchasing-datax-telf1 = 'X'.
+  886  *        " ENDED BY KEDAR SUBRAT ON 03/08/2018 FOR SALES PERSON AND TELE
+       PHONE NUMBER UPDATE
+  887  *        ls_purchasing-data-ekgrp = wa_file_extend-ekgrp.
+  888  *        ls_purchasing-datax-ekgrp = 'X'.
+  889  *
+  890  *        ls_purchasing-data-kalsk         = wa_file_extend-kalsk.
+                                   "SCHEMA GROUP, VENDOR
+  891  *        ls_purchasing-datax-kalsk       = 'X'.
+  892  *
+  893  *        ls_purchasing-data-lebre       = 'X' .
+               " SERVICE-BASED INVOICE VERIFICATION
+  894  *        ls_purchasing-datax-lebre      = 'X'.
+  895  *
+  896  *
+  897  *        ls_purchasing-data-webre       = 'X'."WA_FILE-WEBRE .
+               " GR BASED INVOICE VERIFICATION
+  898  *        ls_purchasing-datax-webre      = 'X'.
+  899  *
+  900  *        CALL METHOD vmd_ei_api_check=>get_mand_partner_functions
+  901  *          EXPORTING
+  902  *            iv_ktokk = lfa1-ktokk
+  903  *          IMPORTING
+  904  *            et_parvw = et_parvw.
+  905  *
+  906  *        LOOP AT et_parvw INTO DATA(wa_parvw).
+  907  *          SELECT SINGLE parvw FROM wyt3
+  908  *            INTO @DATA(lv_pf_exists)
+  909  *            WHERE lifnr = @lv_vendor
+  910  *              AND ekorg = @wa_file_extend-ekorg
+  911  *              AND parvw = @wa_parvw-parvw.
+  912  *
+  913  *          APPEND VALUE #(
+  914  *            task     = COND #( WHEN lv_pf_exists IS NOT INITIAL THEN 'M
+       ' ELSE 'I' )
+  915  *            data_key = VALUE #( parvw = wa_parvw-parvw )
+  916  *            data     = VALUE #( partner = lv_vendor )
+  917  *            datax    = VALUE #( partner = 'X' )
+  918  *          ) TO lt_purch_func.
+  919  *        ENDLOOP.
+  920  *
+  921  *        ls_purchasing-functions-functions =  lt_purch_func[].
+  922  *        APPEND ls_purchasing TO ls_vendors-purchasing_data-purchasing.
+  923  *      ENDIF.
+  924  *      APPEND ls_vendors TO gs_vmds_extern-vendors.
+  925  *
+  926  *      vmd_ei_api=>initialize( ).
+  927  **   CALL THE METHOD FOR CREATION OF VENDOR.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     26
+--------------------------------------------------------------------------------
+
+  928  *      CALL METHOD vmd_ei_api=>maintain_bapi
+  929  *        EXPORTING
+  930  *          is_master_data           = gs_vmds_extern
+  931  *        IMPORTING
+  932  *          es_master_data_correct   = gs_vmds_succ
+  933  *          es_message_correct       = gs_succ_messages
+  934  *          es_master_data_defective = gs_vmds_error
+  935  *          es_message_defective     = gs_err_messages.
+  936  *      IF gs_err_messages-is_error IS INITIAL.
+  937  *        COMMIT WORK.
+  938  *        WAIT UP TO 2 SECONDS.
+  939  *        w_log_ex-msgty = 'S'.
+  940  *        w_log_ex-message = |Vendor { lv_vendor } extended successfully.
+       |.
+  941  *        CLEAR w_msg.
+  942  *      ELSE.
+  943  *        ROLLBACK WORK.
+  944  *        w_log_ex-msgty = 'E'.
+  945  *        LOOP AT gs_err_messages-messages INTO DATA(ls_msg).
+  946  *          IF w_log_ex-message IS INITIAL.
+  947  *            w_log_ex-message = ls_msg-message.
+  948  *          ELSE.
+  949  *            w_log_ex-message = |{ w_log_ex-message } / { ls_msg-message
+        }|.
+  950  *          ENDIF.
+  951  *        ENDLOOP.
+  952  *      ENDIF.
+  953  *      APPEND w_log_ex TO t_log_ex.
+  954  *    ELSE.
+  955  *      MESSAGE : 'PLEASE PROVIDE EXISTING BP NO' TYPE 'I' DISPLAY LIKE '
+       E'.
+  956  *      LEAVE LIST-PROCESSING.
+  957  *    ENDIF.
+  958  *    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+  959  *    CALL FUNCTION 'BUFFER_REFRESH_ALL'.
+  960  *    REFRESH: lt_purch_func[],
+  961  *           ls_vendors-company_data-company[],
+  962  *           ls_vendors-purchasing_data-purchasing[],
+  963  *           gs_vmds_extern-vendors[].
+  964  *    CLEAR: wa_file_extend, gs_vmds_extern, ls_vendors, lv_vendor, busin
+       esspartner.
+  965  *  ENDLOOP.
+  966  *ENDFORM.
+  967  *&---------------------------------------------------------------------*
+  968  *& Form download_log_to_excel
+  969  *&---------------------------------------------------------------------*
+  970  *& text
+  971  *&---------------------------------------------------------------------*
+  972  *& -->  p1        text
+  973  *& <--  p2        text
+  974  *&---------------------------------------------------------------------*
+  975  FORM download_log_to_excel.
+  976    DATA: lv_filename TYPE string,
+  977          lv_path     TYPE string,
+  978          lv_fullpath TYPE string.
+  979
+  980    cl_gui_frontend_services=>file_save_dialog(
+  981      EXPORTING
+  982        default_extension = 'XLSX'
+  983        default_file_name = |BP_Vendor_Log_{ sy-datum }_{ sy-uzeit }.xls|
+  984      CHANGING
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     27
+--------------------------------------------------------------------------------
+
+  985        filename          = lv_filename
+  986        path              = lv_path
+  987        fullpath          = lv_fullpath ).
+  988
+  989    IF lv_fullpath IS NOT INITIAL.
+  990      CALL FUNCTION 'GUI_DOWNLOAD'
+  991        EXPORTING
+  992          filename              = lv_fullpath
+  993          filetype              = 'ASC'
+  994          write_field_separator = 'X' " Makes it readable by Excel
+  995          confirm_overwrite     = 'X'
+  996        TABLES
+  997          data_tab              = t_log
+  998        EXCEPTIONS
+  999          file_write_error      = 1
+ 1000          OTHERS                = 2.
+ 1001
+ 1002      IF sy-subrc = 0.
+ 1003        MESSAGE 'Log downloaded successfully.' TYPE 'S'.
+ 1004      ENDIF.
+ 1005    ENDIF.
+ 1006  ENDFORM.
+ 1007  *&---------------------------------------------------------------------*
+ 1008  *& Form display_log
+ 1009  *&---------------------------------------------------------------------*
+ 1010  *& text
+ 1011  *&---------------------------------------------------------------------*
+ 1012  *& -->  p1        text
+ 1013  *& <--  p2        text
+ 1014  *&---------------------------------------------------------------------*
+ 1015  FORM display_log .
+ 1016    " Inline Field Catalog Definition (Avoids long manually-built tables)
+ 1017    DATA(lt_fcat) = VALUE slis_t_fieldcat_alv(
+ 1018      ( fieldname = 'BPARTNER'     seltext_m = 'Vendor Code' hotspot = 'X'
+        )
+ 1019      ( fieldname = 'PARTN_GRP'    seltext_m = 'Vendor Account group' )
+ 1020      ( fieldname = 'NAME_FIRST'   seltext_m = 'Name 1' )
+ 1021      ( fieldname = 'NAME_LAST'    seltext_m = 'Name 2' )
+ 1022      ( fieldname = 'STCD3'        seltext_m = 'GST Tax Number' )
+ 1023      ( fieldname = 'J_1IPANNO'    seltext_m = 'Pan No' )
+ 1024      ( fieldname = 'Flag'         seltext_m = 'Error Type' )
+ 1025      ( fieldname = 'MESSAGE'       seltext_m = 'Log Details' outputlen =
+       255 )
+ 1026    ).
+ 1027
+ 1028    DATA(ls_layout) = VALUE slis_layout_alv(
+ 1029      colwidth_optimize = 'X'
+ 1030      zebra             = 'X'
+ 1031    ).
+ 1032
+ 1033    CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+ 1034      EXPORTING
+ 1035        i_callback_program      = sy-repid
+ 1036        i_callback_user_command = 'USER_COMMAND'
+ 1037        i_callback_top_of_page  = 'TOP_OF_PAGE'
+ 1038        is_layout               = ls_layout
+ 1039        it_fieldcat             = lt_fcat
+ 1040      TABLES
+ 1041        t_outtab                = t_log
+ 1042      EXCEPTIONS
+ 1043        program_error           = 1
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     28
+--------------------------------------------------------------------------------
+
+ 1044        OTHERS                  = 2.
+ 1045  ENDFORM.
+ 1046  *&---------------------------------------------------------------------*
+ 1047  *& Form download_log_to_excel_ex
+ 1048  *&---------------------------------------------------------------------*
+ 1049  *& text
+ 1050  *&---------------------------------------------------------------------*
+ 1051  *& -->  p1        text
+ 1052  *& <--  p2        text
+ 1053  *&---------------------------------------------------------------------*
+ 1054  FORM download_log_to_excel_ex.
+ 1055    DATA: lv_filename TYPE string,
+ 1056          lv_path     TYPE string,
+ 1057          lv_fullpath TYPE string.
+ 1058
+ 1059    cl_gui_frontend_services=>file_save_dialog(
+ 1060      EXPORTING
+ 1061        default_extension = 'XLSX'
+ 1062        default_file_name = |BP_Vendor__Extension_Log_{ sy-datum }_{ sy-uz
+       eit }.xls|
+ 1063      CHANGING
+ 1064        filename          = lv_filename
+ 1065        path              = lv_path
+ 1066        fullpath          = lv_fullpath ).
+ 1067
+ 1068    IF lv_fullpath IS NOT INITIAL.
+ 1069      CALL FUNCTION 'GUI_DOWNLOAD'
+ 1070        EXPORTING
+ 1071          filename              = lv_fullpath
+ 1072          filetype              = 'ASC'
+ 1073          write_field_separator = 'X' " Makes it readable by Excel
+ 1074          confirm_overwrite     = 'X'
+ 1075        TABLES
+ 1076          data_tab              = t_log_ex
+ 1077        EXCEPTIONS
+ 1078          file_write_error      = 1
+ 1079          OTHERS                = 2.
+ 1080
+ 1081      IF sy-subrc = 0.
+ 1082        MESSAGE 'Log downloaded successfully.' TYPE 'S'.
+ 1083      ENDIF.
+ 1084    ENDIF.
+ 1085  ENDFORM.
+ 1086  *&---------------------------------------------------------------------*
+ 1087  *& Form display_log_ex
+ 1088  *&---------------------------------------------------------------------*
+ 1089  *& text
+ 1090  *&---------------------------------------------------------------------*
+ 1091  *& -->  p1        text
+ 1092  *& <--  p2        text
+ 1093  *&---------------------------------------------------------------------*
+ 1094  FORM display_log_ex.
+ 1095    " Inline Field Catalog Definition (Avoids long manually-built tables)
+ 1096    DATA(lt_fcat) = VALUE slis_t_fieldcat_alv(
+ 1097      ( fieldname = 'BPARTNER' seltext_m = 'Vendor Code' hotspot = 'X' )
+ 1098      ( fieldname = 'BUKRS'    seltext_m = 'Company Code' )
+ 1099      ( fieldname = 'EKORG'    seltext_m = 'Purchase Organization' )
+ 1100      ( fieldname = 'MSGTY'    seltext_m = 'Status' icon = 'X' )
+ 1101      ( fieldname = 'MESSAGE'  seltext_m = 'Log Details' outputlen = 255 )
+ 1102    ).
+ 1103
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     29
+--------------------------------------------------------------------------------
+
+ 1104    DATA(ls_layout) = VALUE slis_layout_alv(
+ 1105      colwidth_optimize = 'X'
+ 1106      zebra             = 'X'
+ 1107    ).
+ 1108
+ 1109    CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+ 1110      EXPORTING
+ 1111        i_callback_program      = sy-repid
+ 1112        i_callback_user_command = 'USER_COMMAND'
+ 1113        i_callback_top_of_page  = 'TOP_OF_PAGE_EX'
+ 1114        is_layout               = ls_layout
+ 1115        it_fieldcat             = lt_fcat
+ 1116      TABLES
+ 1117        t_outtab                = t_log_ex
+ 1118      EXCEPTIONS
+ 1119        program_error           = 1
+ 1120        OTHERS                  = 2.
+ 1121  ENDFORM.
+ 1122  *&---------------------------------------------------------------------*
+ 1123  *& Form user_command
+ 1124  *&---------------------------------------------------------------------*
+ 1125  *& text
+ 1126  *&---------------------------------------------------------------------*
+ 1127  *& -->  p1        text
+ 1128  *& <--  p2        text
+ 1129  *&---------------------------------------------------------------------*
+ 1130  " Optional: Add this to make the Material Number clickable
+ 1131  FORM user_command USING r_ucomm LIKE sy-ucomm
+ 1132                          rs_selfield TYPE slis_selfield.
+ 1133    CASE r_ucomm.
+ 1134      WHEN '&IC1'. " Standard Hotspot/Double-click code
+ 1135  ****      IF rs_selfield-fieldname = 'BPARTNER' AND rs_selfield-value IS
+        NOT INITIAL.
+ 1136  ****        SET PARAMETER ID 'BPA' FIELD rs_selfield-value.
+ 1137  ****        CALL TRANSACTION 'BP' AND SKIP FIRST SCREEN.
+ 1138  ****      ENDIF.
+ 1139        IF rs_selfield-fieldname = 'BPARTNER' AND rs_selfield-value IS NOT
+        INITIAL.
+ 1140
+ 1141          " 1. Create a navigation request
+ 1142          DATA(lo_request) = NEW cl_bupa_navigation_request( ).
+ 1143          lo_request->set_partner_number( |{ rs_selfield-value ALPHA = IN
+       }| ). " Ensure leading zeros
+ 1144          lo_request->set_bupa_activity( '03' ). " 03 = Display, 02 = Chan
+       ge
+ 1145
+ 1146          " 2. Set UI options (optional: hide the locator/history sidebar)
+ 1147          DATA(lo_options) = NEW cl_bupa_dialog_joel_options( ).
+ 1148          lo_options->set_locator_visible( abap_false ).
+ 1149
+ 1150          " 3. Start the BP transaction with this specific navigation
+ 1151          cl_bupa_dialog_joel=>start_with_navigation(
+ 1152            EXPORTING
+ 1153              iv_request              = lo_request
+ 1154              iv_options              = lo_options
+ 1155              iv_in_new_internal_mode = abap_true " Opens in the same wind
+       ow
+ 1156          ).
+ 1157        ENDIF.
+ 1158    ENDCASE.
+ 1159  ENDFORM.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     30
+--------------------------------------------------------------------------------
+
+ 1160  *&---------------------------------------------------------------------*
+ 1161  *& FORM TOP_OF_PAGE
+ 1162  *&---------------------------------------------------------------------*
+ 1163  FORM top_of_page.
+ 1164    DATA: lt_header TYPE slis_t_listheader,
+ 1165          lv_total  TYPE i,
+ 1166          lv_errors TYPE i.
+ 1167
+ 1168    " Calculate stats for the header
+ 1169    lv_total  = lines( t_log ).
+ 1170    lv_errors = REDUCE i( INIT count = 0 FOR m IN t_log WHERE ( msgty CA '
+       EA' ) NEXT count = count + 1 ).
+ 1171
+ 1172    " 1. Main Title (Type H)
+ 1173    APPEND VALUE #( typ = 'H' info = 'BP Vendor Upload Execution Log' ) TO
+        lt_header.
+ 1174
+ 1175    " 2. Selection Info (Type S)
+ 1176    APPEND VALUE #( typ = 'S' key = 'Date: '   info = |{ sy-datum DATE = U
+       SER }| ) TO lt_header.
+ 1177    APPEND VALUE #( typ = 'S' key = 'User: '   info = |{ sy-uname }| ) TO
+       lt_header.
+ 1178
+ 1179    " 3. Summary Action (Type A)
+ 1180    APPEND VALUE #( typ = 'A' info = |Total Records: { lv_total } | ) TO l
+       t_header.
+ 1181    APPEND VALUE #( typ = 'A' info = |Errors Found: { lv_errors }| ) TO lt
+       _header.
+ 1182
+ 1183    CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+ 1184      EXPORTING
+ 1185        it_list_commentary = lt_header.
+ 1186  ENDFORM.
+ 1187  *&---------------------------------------------------------------------*
+ 1188  *& FORM TOP_OF_PAGE
+ 1189  *&---------------------------------------------------------------------*
+ 1190  FORM top_of_page_ex.
+ 1191    DATA: lt_header TYPE slis_t_listheader,
+ 1192          lv_total  TYPE i,
+ 1193          lv_errors TYPE i.
+ 1194
+ 1195    " Calculate stats for the header
+ 1196    lv_total  = lines( t_log_ex ).
+ 1197    lv_errors = REDUCE i( INIT count = 0 FOR m IN t_log_ex WHERE ( msgty C
+       A 'EA' ) NEXT count = count + 1 ).
+ 1198
+ 1199    " 1. Main Title (Type H)
+ 1200    APPEND VALUE #( typ = 'H' info = 'BP Vendor Extension Upload Execution
+        Log' ) TO lt_header.
+ 1201
+ 1202    " 2. Selection Info (Type S)
+ 1203    APPEND VALUE #( typ = 'S' key = 'Date: '   info = |{ sy-datum DATE = U
+       SER }| ) TO lt_header.
+ 1204    APPEND VALUE #( typ = 'S' key = 'User: '   info = |{ sy-uname }| ) TO
+       lt_header.
+ 1205
+ 1206    " 3. Summary Action (Type A)
+ 1207    APPEND VALUE #( typ = 'A' info = |Total Records: { lv_total } | ) TO l
+       t_header.
+ 1208    APPEND VALUE #( typ = 'A' info = |Errors Found: { lv_errors }| ) TO lt
+       _header.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     31
+--------------------------------------------------------------------------------
+
+ 1209
+ 1210    CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+ 1211      EXPORTING
+ 1212        it_list_commentary = lt_header.
+ 1213  ENDFORM.
+ 1214  FORM call_bapi_bupa_central_change.
+ 1215    CLEAR businesspartner.
+ 1216    DATA: tax_return TYPE bapiret2_t.
+ 1217    x_save_add-save_addr = 'X'.
+ 1218    businesspartner      = wa_file-bpartner.
+ 1219
+ 1220    " Map data based on Partner Category using modern VALUE and SWITCH exp
+       ressions
+ 1221    CASE partnercategory.
+ 1222      WHEN 1.
+ 1223        centraldatapersonx = VALUE #( firstname            = abap_true
+ 1224                                      lastname             = abap_true
+ 1225                                      birthname            = abap_true
+ 1226                                      correspondlanguage   = abap_true
+ 1227                                      correspondlanguageiso = abap_true ).
+ 1228        chk_address        = VALUE #( BASE chk_address langu = 'E' languis
+       o = 'EN' ).
+ 1229      WHEN 2.
+ 1230        centraldataorganizationx = VALUE #( name1 = abap_true
+ 1231                                            name2 = abap_true
+ 1232                                            name3 = abap_true
+ 1233                                            name4 = abap_true
+ 1234                                            loc_no_1 = abap_true
+ 1235                                            loc_no_2 = abap_true ).
+ 1236      WHEN 3.
+ 1237        central_groupx           = VALUE #( namegroup1 = 'X'
+ 1238                                            namegroup2 = 'X' ).
+ 1239    ENDCASE.
+ 1240
+ 1241    CALL FUNCTION 'BAPI_BUPA_CENTRAL_CHANGE'
+ 1242      EXPORTING
+ 1243        businesspartner           = wa_file-bpartner
+ 1244  ****      centraldata               = centraldata
+ 1245        centraldataperson         = centraldataperson
+ 1246        centraldataorganization   = centraldataorganization
+ 1247        centraldatagroup          = central_group
+ 1248  ****      centraldata_x             = centraldatax
+ 1249        centraldataperson_x       = centraldatapersonx
+ 1250        centraldataorganization_x = centraldataorganizationx
+ 1251        centraldatagroup_x        = central_groupx
+ 1252        duplicate_check_address   = chk_address
+ 1253      TABLES
+ 1254        return                    = return
+ 1255  *     ADDRESSDUPLICATES         =
+ 1256      .
+ 1257    w_log = CORRESPONDING #( wa_file ).
+ 1258
+ 1259    IF businesspartner IS NOT INITIAL.
+ 1260      " Synchronous commit - wait = 'X' makes 'WAIT UP TO' unnecessary
+ 1261      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+ 1262
+ 1263      w_log-message = COND #( WHEN line_exists( return[ type = 'E' ] )
+ 1264                              THEN 'BUSINESS PARTNER IS NOT CHANGED'
+ 1265                              ELSE 'BUSINESS PARTNER CHANGED' ).
+ 1266
+ 1267      " Handle Tax Update only if BP was successful
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     32
+--------------------------------------------------------------------------------
+
+ 1268  ****    IF NOT line_exists( return[ type = 'E' ] ).
+ 1269  ****      IF wa_file-stcd3 IS NOT INITIAL AND wa_file-taxtype IS NOT INI
+       TIAL.
+ 1270  ****        wa_final_2-taxnum = wa_file-stcd3.
+ 1271  ****        wa_final_2-taxtype =  wa_file-taxtype.
+ 1272  ****
+ 1273  ****        CALL FUNCTION 'BAPI_BUPA_TAX_ADD'
+ 1274  ****          EXPORTING
+ 1275  ****            businesspartner = w_log-bpartner
+ 1276  ****            taxtype         = wa_final_2-taxtype
+ 1277  ****            taxnumber       = wa_final_2-taxnum
+ 1278  ****          TABLES
+ 1279  ****            return          = tax_return.
+ 1280  ****        IF sy-subrc = 0.
+ 1281  ****          COMMIT WORK AND WAIT.
+ 1282  ****          w_log-message = |{ w_log-message } & GST UPDATED|.
+ 1283  ****        ELSE.
+ 1284  ****          LOOP AT tax_return INTO DATA(ls_ret_gst).
+ 1285  ****            w_log-message = |{ w_log-message } / GST: { ls_ret_gst-m
+       essage }|.
+ 1286  ****          ENDLOOP.
+ 1287  ****        ENDIF.
+ 1288  ****      ELSE.
+ 1289  ****        w_log-message = 'BP CREATED/UPDATED: STCD3 GST MISSING IN FI
+       LE'.
+ 1290  ****      ENDIF.
+ 1291  ****    ENDIF.
+ 1292
+ 1293      IF line_exists( return[ type = 'E' ] ).
+ 1294        w_log-message = return[ type = 'E' ]-message.
+ 1295      ENDIF.
+ 1296
+ 1297      w_log-bpartner = COND #( WHEN businesspartnerextern IS NOT INITIAL
+ 1298                               THEN businesspartnerextern
+ 1299                               ELSE businesspartner ).
+ 1300
+ 1301    ENDIF.
+ 1302
+ 1303    " Final global variable update
+ 1304    businesspartner = COND #( WHEN businesspartnerextern IS NOT INITIAL
+ 1305                              THEN businesspartnerextern
+ 1306                              ELSE businesspartner ).
+ 1307  ENDFORM.
+ 1308  *&---------------------------------------------------------------------*
+ 1309  *& Form CREATE_BP_VENDOR
+ 1310  *&---------------------------------------------------------------------*
+ 1311  *& text
+ 1312  *&---------------------------------------------------------------------*
+ 1313  *& -->  p1        text
+ 1314  *& <--  p2        text
+ 1315  *&---------------------------------------------------------------------*
+ 1316  FORM change_bp_vendor.
+ 1317    LOOP AT it_file_extend ASSIGNING FIELD-SYMBOL(<fs_change>).
+ 1318      CLEAR : businesspartnerextern,
+ 1319              partnercategory,
+ 1320              partnergroup,
+ 1321              centraldata,
+ 1322              centraldataperson,
+ 1323              centraldataorganization,
+ 1324              addressdata.
+ 1325      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     33
+--------------------------------------------------------------------------------
+
+ 1326        EXPORTING
+ 1327          input  = <fs_change>-bpartner
+ 1328        IMPORTING
+ 1329          output = <fs_change>-bpartner.
+ 1330
+ 1331      CLEAR businesspartnerextern.
+ 1332
+ 1333      IF wa_file-bpartner IS NOT INITIAL.
+ 1334        SELECT SINGLE partner FROM but000 INTO @DATA(lv_partner) WHERE par
+       tner = @<fs_change>-bpartner.
+ 1335        IF sy-subrc <> 0.
+ 1336          businesspartnerextern = <fs_change>-bpartner.
+ 1337        ENDIF.
+ 1338      ENDIF.
+ 1339      IF lv_partner IS NOT INITIAL AND <fs_change>-bpartner IS NOT INITIAL
+       .
+ 1340        PERFORM call_bapi_bupa_central_change.
+ 1341      ENDIF.
+ 1342
+ 1343      IF businesspartner IS NOT INITIAL.
+ 1344        " Add Vendor Roles (FLVN00 for FI, FLVN01 for Purchasing)
+ 1345        PERFORM add_vendor_roles.
+ 1346
+ 1347        SELECT SINGLE link~vendor
+ 1348          FROM but000 AS bp
+ 1349          INNER JOIN cvi_vend_link AS link ON bp~partner_guid = link~partn
+       er_guid
+ 1350          WHERE bp~partner = @wa_file-bpartner
+ 1351          INTO @DATA(lv_vend_id).
+ 1352        IF sy-subrc = 0.
+ 1353          lv_vendor = lv_vend_id.
+ 1354          w_log-message = |{ w_log-message } Linked Vendor: { lv_vend_id }
+       .|.
+ 1355          SELECT SINGLE * FROM lfa1 WHERE lifnr = lv_vendor.
+ 1356          IF sy-subrc = 0.
+ 1357            wa_file-lifnr = lfa1-lifnr.
+ 1358          ENDIF.
+ 1359          SELECT SINGLE * FROM but020 WHERE partner = wa_file-bpartner.
+ 1360          REFRESH : t_lfa1[].
+ 1361          SELECT lifnr ktokk FROM lfa1 INTO TABLE t_lfa1 WHERE lifnr = lv_
+       vendor.
+ 1362
+ 1363          CREATE OBJECT lo_data.
+ 1364          CALL METHOD lo_data->create_vendor_data.
+ 1365        ENDIF.
+ 1366        SELECT SINGLE link~vendor
+ 1367          FROM but000 AS bp
+ 1368          INNER JOIN cvi_vend_link AS link ON bp~partner_guid = link~partn
+       er_guid
+ 1369          WHERE bp~partner = @wa_file-bpartner
+ 1370          INTO @lv_vend_id.
+ 1371        IF lv_vend_id IS NOT INITIAL.
+ 1372          UPDATE lfa1 SET ven_class = wa_file-ven_class
+ 1373                      j_1ipanno = wa_file-j_1ipanno
+ 1374                      j_1iexcd  = wa_file-j_1iexcd
+ 1375                      j_1iexrn  = wa_file-j_1iexrn
+ 1376                      j_1iexrg  = wa_file-j_1iexrg
+ 1377                      j_1iexdi  = wa_file-j_1iexdi
+ 1378                      j_1iexco  = wa_file-j_1iexco
+ 1379                      j_1ivtyp  = wa_file-j_1ivtyp
+ 1380                      j_1isern  = wa_file-j_1isern
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     34
+--------------------------------------------------------------------------------
+
+ 1381                      j_1kftbus = wa_file-j_1kftbus     " J Newly Added
+ 1382                      j_1kftind = wa_file-j_1kftind     " J Newly Added
+ 1383                      bahns     = wa_file-bahns         " J Newly Added
+ 1384                      stenr     = wa_file-stenr         " J Newly Added
+ 1385                      profs     = wa_file-profs
+ 1386                         WHERE lifnr = lv_vendor.
+ 1387          COMMIT WORK AND WAIT.
+ 1388          w_log-message = |{ w_log-message } LFA1 data modified. |.
+ 1389        ENDIF.
+ 1390      ENDIF.
+ 1391      APPEND w_log TO t_log.
+ 1392      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+ 1393      CALL FUNCTION 'BUFFER_REFRESH_ALL'.
+ 1394      CLEAR: lv_vend_id, businesspartner, wa_file.
+ 1395    ENDLOOP.
+ 1396  ENDFORM.
+ 1397
+ 1398
+ 1399
+ 1400  *&=====================================================================*
+ 1401  *&  UNIT 3  -  NEW  -  Include ZMM_VEND_MASTER_FORMS                   *
+ 1402  *&  FSD30 R4 : validation + duplicate check for CREATE mode.           *
+ 1403  *&  Invalid rows are logged (msgty 'E') and removed from it_file so    *
+ 1404  *&  they are never processed; valid rows continue. Batch never stops.  *
+ 1405  *&=====================================================================*
+ 1406  FORM validate_create.                                       "FSD30 R4
+ 1407    DATA: lt_valid    TYPE STANDARD TABLE OF ty_file_bp,
+ 1408          lt_seen_pan TYPE HASHED TABLE OF j_1ipanno WITH UNIQUE KEY table
+       _line,
+ 1409          lt_seen_gst TYPE HASHED TABLE OF stcd3     WITH UNIQUE KEY table
+       _line,
+ 1410          lv_row      TYPE i,
+ 1411          lv_err      TYPE string.
+ 1412
+ 1413    LOOP AT it_file INTO wa_file.
+ 1414      lv_row = sy-tabix.
+ 1415      CLEAR: lv_err, w_log.
+ 1416
+ 1417      " --- mandatory fields (R4) ---
+ 1418      IF wa_file-partn_grp IS INITIAL.
+ 1419        lv_err = |{ lv_err }BP Grouping missing; |.
+ 1420      ENDIF.
+ 1421      IF wa_file-partn_cat IS INITIAL.
+ 1422        lv_err = |{ lv_err }Partner Category missing; |.
+ 1423      ENDIF.
+ 1424      IF wa_file-name_first IS INITIAL.
+ 1425        lv_err = |{ lv_err }Name1 missing; |.
+ 1426      ENDIF.
+ 1427
+ 1428      " --- master-data existence for the extension targets ---
+ 1429      IF wa_file-bukrs IS NOT INITIAL.
+ 1430        SELECT SINGLE bukrs FROM t001 INTO @DATA(lv_bukrs) WHERE bukrs = @
+       wa_file-bukrs.
+ 1431        IF sy-subrc <> 0.
+ 1432          lv_err = |{ lv_err }Company Code { wa_file-bukrs } does not exis
+       t; |.
+ 1433        ENDIF.
+ 1434      ENDIF.
+ 1435      IF wa_file-ekorg IS NOT INITIAL.
+ 1436        SELECT SINGLE ekorg FROM t024e INTO @DATA(lv_ekorg) WHERE ekorg =
+       @wa_file-ekorg.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     35
+--------------------------------------------------------------------------------
+
+ 1437        IF sy-subrc <> 0.
+ 1438          lv_err = |{ lv_err }Purch Org { wa_file-ekorg } does not exist;
+       |.
+ 1439        ENDIF.
+ 1440      ENDIF.
+ 1441
+ 1442      " --- duplicate check : within file + against database (R4 / O4) ---
+ 1443      " NOTE (O4): confirm precedence GST vs PAN vs Tax No. with functiona
+       l.
+ 1444      IF wa_file-stcd3 IS NOT INITIAL.
+ 1445        IF line_exists( lt_seen_gst[ table_line = wa_file-stcd3 ] ).
+ 1446          lv_err = |{ lv_err }Duplicate GST { wa_file-stcd3 } within file;
+        |.
+ 1447        ELSE.
+ 1448          INSERT wa_file-stcd3 INTO TABLE lt_seen_gst.
+ 1449          SELECT SINGLE partner FROM dfkkbptaxnum INTO @DATA(lv_ptnr)
+ 1450                 WHERE taxnum = @wa_file-stcd3.
+ 1451          IF sy-subrc = 0.
+ 1452            lv_err = |{ lv_err }GST { wa_file-stcd3 } already exists (BP {
+        lv_ptnr }); |.
+ 1453          ENDIF.
+ 1454        ENDIF.
+ 1455      ENDIF.
+ 1456      IF wa_file-j_1ipanno IS NOT INITIAL.
+ 1457        IF line_exists( lt_seen_pan[ table_line = wa_file-j_1ipanno ] ).
+ 1458          lv_err = |{ lv_err }Duplicate PAN { wa_file-j_1ipanno } within f
+       ile; |.
+ 1459        ELSE.
+ 1460          INSERT wa_file-j_1ipanno INTO TABLE lt_seen_pan.
+ 1461        ENDIF.
+ 1462      ENDIF.
+ 1463
+ 1464      " --- verdict ---
+ 1465      IF lv_err IS NOT INITIAL.
+ 1466        w_log         = CORRESPONDING #( wa_file ).
+ 1467        w_log-rowno   = lv_row.
+ 1468        w_log-msgty   = 'E'.
+ 1469        w_log-message = lv_err.
+ 1470        APPEND w_log TO t_log.            "logged as failed, not processed
+ 1471      ELSE.
+ 1472        APPEND wa_file TO lt_valid.       "keep for processing
+ 1473      ENDIF.
+ 1474    ENDLOOP.
+ 1475
+ 1476    it_file = lt_valid.                   "only valid rows go forward
+ 1477  ENDFORM.                                                    "FSD30 R4
+ 1478
+ 1479
+ 1480  *&=====================================================================*
+ 1481  *&  UNIT 4  -  NEW  -  Include ZMM_VEND_MASTER_FORMS                   *
+ 1482  *&  FSD30 R3/R4 : validation for CHANGE mode. BP number mandatory and  *
+ 1483  *&  must already exist. Bad rows logged & skipped; batch continues.    *
+ 1484  *&=====================================================================*
+ 1485  FORM validate_change.                                       "FSD30 R3/R4
+ 1486    DATA: lt_valid TYPE STANDARD TABLE OF ty_file_extend,
+ 1487          lv_row   TYPE i,
+ 1488          lv_err   TYPE string,
+ 1489          lv_bp    TYPE bu_partner.
+ 1490
+ 1491    LOOP AT it_file_extend INTO wa_file_extend.
+ 1492      lv_row = sy-tabix.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     36
+--------------------------------------------------------------------------------
+
+ 1493      CLEAR: lv_err.
+ 1494
+ 1495      IF wa_file_extend-bpartner IS INITIAL.
+ 1496        lv_err = 'Change mode: BP number is mandatory'.
+ 1497      ELSE.
+ 1498        lv_bp = |{ wa_file_extend-bpartner ALPHA = IN }|.
+ 1499        SELECT SINGLE partner FROM but000 INTO @DATA(lv_x) WHERE partner =
+        @lv_bp.
+ 1500        IF sy-subrc <> 0.
+ 1501          lv_err = |BP { wa_file_extend-bpartner } does not exist|.
+ 1502        ENDIF.
+ 1503      ENDIF.
+ 1504
+ 1505      IF lv_err IS NOT INITIAL.
+ 1506        CLEAR w_log_ex.
+ 1507        w_log_ex         = CORRESPONDING #( wa_file_extend ).
+ 1508        w_log_ex-rowno   = lv_row.
+ 1509        w_log_ex-msgty   = 'E'.
+ 1510        w_log_ex-message = lv_err.
+ 1511        APPEND w_log_ex TO t_log_ex.
+ 1512      ELSE.
+ 1513        APPEND wa_file_extend TO lt_valid.
+ 1514      ENDIF.
+ 1515    ENDLOOP.
+ 1516
+ 1517    it_file_extend = lt_valid.
+ 1518  ENDFORM.                                                    "FSD30 R3/R4
+ 1519
+ 1520
+ 1521  *&=====================================================================*
+ 1522  *&  UNIT 5  -  MODIFIED  -  Include ZMM_VEND_MASTER_FORMS  (extend_bp) *
+ 1523  *&  FSD30 R2/R3 : shared maintain routine used by EXTEND and CHANGE.   *
+ 1524  *&  Changes vs baseline:                                               *
+ 1525  *&   (a) NO hard stop - a missing/invalid BP is logged and the loop    *
+ 1526  *&       continues (baseline did MESSAGE + LEAVE LIST-PROCESSING).     *
+ 1527  *&   (b) "already extended" detection on LFB1 (CC) and LFM1 (Purch)    *
+ 1528  *&       -> Warning, kept SEPARATE from creation status (R2).          *
+ 1529  *&   (c) CHANGE-safe : each datax flag is set ONLY when the file field *
+ 1530  *&       is populated, so blank cells never overwrite master data (R3).*
+ 1531  *&   (d) per-role status stat_cc / stat_po + overall msgty S/W/E (R1). *
+ 1532  *&  Replace the whole baseline FORM extend_bp with the version below.  *
+ 1533  *&=====================================================================*
+ 1534  FORM extend_bp.                                             "FSD30 R2/R3
+ 1535    DATA: lv_row     TYPE i,
+ 1536          lv_mode_tx TYPE string.
+ 1537
+ 1538    lv_mode_tx = COND #( WHEN rb_chg = 'X' THEN 'changed' ELSE 'extended'
+       ). "R3
+ 1539
+ 1540    LOOP AT it_file_extend INTO wa_file_extend.
+ 1541      lv_row = sy-tabix.
+ 1542      CLEAR: w_log_ex, l_partner, lv_vendor, businesspartner.
+ 1543      MOVE-CORRESPONDING wa_file_extend TO w_log_ex.
+ 1544      w_log_ex-rowno = lv_row.                                "R1
+ 1545
+ 1546      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+ 1547        EXPORTING  input  = wa_file_extend-bpartner
+ 1548        IMPORTING  output = wa_file_extend-bpartner.
+ 1549
+ 1550      SELECT SINGLE partner FROM but000 INTO l_partner
+ 1551             WHERE partner = wa_file_extend-bpartner.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     37
+--------------------------------------------------------------------------------
+
+ 1552      IF sy-subrc <> 0.
+ 1553        " (a) no hard stop - log and carry on
+ 1554        w_log_ex-msgty   = 'E'.
+ 1555        w_log_ex-message = 'Please provide an existing BP number'.
+ 1556        APPEND w_log_ex TO t_log_ex.
+ 1557        CONTINUE.
+ 1558      ENDIF.
+ 1559
+ 1560      businesspartner = wa_file_extend-bpartner.
+ 1561      SELECT SINGLE * FROM but000 INTO wa_but000
+ 1562             WHERE partner = wa_file_extend-bpartner AND partner_guid NE '
+       '.
+ 1563      IF sy-subrc = 0.
+ 1564        SELECT SINGLE vendor FROM cvi_vend_link INTO lv_vendor
+ 1565               WHERE partner_guid = wa_but000-partner_guid.
+ 1566        IF sy-subrc = 0.
+ 1567          SELECT SINGLE * FROM lfa1 WHERE lifnr = lv_vendor.
+ 1568          REFRESH t_lfa1[].
+ 1569          SELECT lifnr ktokk FROM lfa1 INTO TABLE t_lfa1 WHERE lifnr = lv_
+       vendor.
+ 1570        ENDIF.
+ 1571      ENDIF.
+ 1572
+ 1573      ls_vendors-header-object_instance-lifnr = lv_vendor.
+ 1574      ls_vendors-header-object_task           = 'U'.
+ 1575
+ 1576      "================= COMPANY CODE VIEW =================
+ 1577      IF wa_file_extend-bukrs IS NOT INITIAL.
+ 1578        REFRESH lt_company[].
+ 1579        CLEAR ls_company.
+ 1580
+ 1581        " (b) already-extended detection -> warning, separate status (R2)
+ 1582        SELECT SINGLE bukrs FROM lfb1 INTO @DATA(lv_lfb1)
+ 1583               WHERE lifnr = @lv_vendor AND bukrs = @wa_file_extend-bukrs.
+ 1584        IF sy-subrc = 0.
+ 1585          w_log_ex-stat_cc = 'W'.
+ 1586          w_log_ex-message = |{ w_log_ex-message }CC { wa_file_extend-bukr
+       s } already extended; |.
+ 1587        ELSE.
+ 1588          w_log_ex-stat_cc = 'S'.
+ 1589        ENDIF.
+ 1590
+ 1591        ls_company-task           = 'M'.
+ 1592        ls_company-data_key-bukrs = wa_file_extend-bukrs.
+ 1593
+ 1594        " (c) CHANGE-safe : fill data + set datax ONLY for populated field
+       s
+ 1595        IF wa_file_extend-akont IS NOT INITIAL.
+ 1596          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+ 1597            EXPORTING  input  = wa_file_extend-akont
+ 1598            IMPORTING  output = ls_company-data-akont.
+ 1599          ls_company-datax-akont = 'X'.
+ 1600        ENDIF.
+ 1601        IF wa_file_extend-zterm IS NOT INITIAL.
+ 1602          ls_company-data-zterm = wa_file_extend-zterm.  ls_company-datax-
+       zterm = 'X'.
+ 1603        ENDIF.
+ 1604        IF wa_file_extend-zuawa IS NOT INITIAL.
+ 1605          ls_company-data-zuawa = wa_file_extend-zuawa.  ls_company-datax-
+       zuawa = 'X'.
+ 1606        ENDIF.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     38
+--------------------------------------------------------------------------------
+
+ 1607        IF wa_file_extend-mindk IS NOT INITIAL.
+ 1608          ls_company-data-mindk = wa_file_extend-mindk.  ls_company-datax-
+       mindk = 'X'.
+ 1609        ENDIF.
+ 1610        IF wa_file_extend-cerdt IS NOT INITIAL.
+ 1611          ls_company-data-cerdt = |{ wa_file_extend-cerdt+6(4) }{ wa_file_
+       extend-cerdt+3(2) }{ wa_file_extend-cerdt+0(2) }|.
+ 1612          ls_company-datax-cerdt = 'X'.
+ 1613        ENDIF.
+ 1614        IF wa_file_extend-reprf IS NOT INITIAL.
+ 1615          ls_company-data-reprf = wa_file_extend-reprf.  ls_company-datax-
+       reprf = 'X'.
+ 1616        ENDIF.
+ 1617
+ 1618        APPEND ls_company TO ls_vendors-company_data-company.
+ 1619      ENDIF.
+ 1620
+ 1621      "================= PURCHASING VIEW =================
+ 1622      IF wa_file_extend-ekorg IS NOT INITIAL.
+ 1623        REFRESH: et_parvw[], lt_purchasing[], lt_purch_func[].
+ 1624        CLEAR ls_purchasing.
+ 1625
+ 1626        " (b) already-extended detection -> warning, separate status (R2)
+ 1627        SELECT SINGLE ekorg FROM lfm1 INTO @DATA(lv_lfm1)
+ 1628               WHERE lifnr = @lv_vendor AND ekorg = @wa_file_extend-ekorg.
+ 1629        IF sy-subrc = 0.
+ 1630          w_log_ex-stat_po = 'W'.
+ 1631          w_log_ex-message = |{ w_log_ex-message }Purch Org { wa_file_exte
+       nd-ekorg } already extended; |.
+ 1632        ELSE.
+ 1633          w_log_ex-stat_po = 'S'.
+ 1634        ENDIF.
+ 1635
+ 1636        ls_purchasing-task            = 'M'.
+ 1637        ls_purchasing-data_key-ekorg  = wa_file_extend-ekorg.
+ 1638
+ 1639        IF wa_file_extend-waers IS NOT INITIAL.
+ 1640          ls_purchasing-data-waers = wa_file_extend-waers.  ls_purchasing-
+       datax-waers = 'X'.
+ 1641        ENDIF.
+ 1642        IF wa_file_extend-zterm IS NOT INITIAL.
+ 1643          ls_purchasing-data-zterm = wa_file_extend-zterm.  ls_purchasing-
+       datax-zterm = 'X'.
+ 1644        ENDIF.
+ 1645        IF wa_file_extend-verkf IS NOT INITIAL.
+ 1646          ls_purchasing-data-verkf = wa_file_extend-verkf.  ls_purchasing-
+       datax-verkf = 'X'.
+ 1647        ENDIF.
+ 1648        IF wa_file_extend-telf1 IS NOT INITIAL.
+ 1649          ls_purchasing-data-telf1 = wa_file_extend-telf1.  ls_purchasing-
+       datax-telf1 = 'X'.
+ 1650        ENDIF.
+ 1651        IF wa_file_extend-ekgrp IS NOT INITIAL.
+ 1652          ls_purchasing-data-ekgrp = wa_file_extend-ekgrp.  ls_purchasing-
+       datax-ekgrp = 'X'.
+ 1653        ENDIF.
+ 1654        IF wa_file_extend-kalsk IS NOT INITIAL.
+ 1655          ls_purchasing-data-kalsk = wa_file_extend-kalsk.  ls_purchasing-
+       datax-kalsk = 'X'.
+ 1656        ENDIF.
+ 1657        " GR/Service-based IV kept as baseline defaults for the purchasing
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     39
+--------------------------------------------------------------------------------
+
+        view
+ 1658        ls_purchasing-data-lebre = 'X'.  ls_purchasing-datax-lebre = 'X'.
+ 1659        ls_purchasing-data-webre = 'X'.  ls_purchasing-datax-webre = 'X'.
+ 1660
+ 1661        CALL METHOD vmd_ei_api_check=>get_mand_partner_functions
+ 1662          EXPORTING iv_ktokk = lfa1-ktokk
+ 1663          IMPORTING et_parvw = et_parvw.
+ 1664
+ 1665        LOOP AT et_parvw INTO DATA(wa_parvw).
+ 1666          SELECT SINGLE parvw FROM wyt3 INTO @DATA(lv_pf_exists)
+ 1667                 WHERE lifnr = @lv_vendor AND ekorg = @wa_file_extend-ekor
+       g
+ 1668                   AND parvw = @wa_parvw-parvw.
+ 1669          APPEND VALUE #(
+ 1670            task     = COND #( WHEN lv_pf_exists IS NOT INITIAL THEN 'M' E
+       LSE 'I' )
+ 1671            data_key = VALUE #( parvw = wa_parvw-parvw )
+ 1672            data     = VALUE #( partner = lv_vendor )
+ 1673            datax    = VALUE #( partner = 'X' ) ) TO lt_purch_func.
+ 1674        ENDLOOP.
+ 1675
+ 1676        ls_purchasing-functions-functions = lt_purch_func[].
+ 1677        APPEND ls_purchasing TO ls_vendors-purchasing_data-purchasing.
+ 1678      ENDIF.
+ 1679
+ 1680      APPEND ls_vendors TO gs_vmds_extern-vendors.
+ 1681
+ 1682      vmd_ei_api=>initialize( ).
+ 1683      CALL METHOD vmd_ei_api=>maintain_bapi
+ 1684        EXPORTING is_master_data           = gs_vmds_extern
+ 1685        IMPORTING es_master_data_correct   = gs_vmds_succ
+ 1686                  es_message_correct       = gs_succ_messages
+ 1687                  es_master_data_defective = gs_vmds_error
+ 1688                  es_message_defective     = gs_err_messages.
+ 1689
+ 1690      IF gs_err_messages-is_error IS INITIAL.
+ 1691        COMMIT WORK.
+ 1692        WAIT UP TO 2 SECONDS.
+ 1693        " overall status = worst of the per-role statuses (R1/R2)
+ 1694        w_log_ex-msgty   = COND #( WHEN w_log_ex-stat_cc = 'W' OR w_log_ex
+       -stat_po = 'W'
+ 1695                                   THEN 'W' ELSE 'S' ).
+ 1696        w_log_ex-message = |{ w_log_ex-message }Vendor { lv_vendor } { lv_
+       mode_tx } successfully.|.
+ 1697      ELSE.
+ 1698        ROLLBACK WORK.
+ 1699        w_log_ex-msgty = 'E'.
+ 1700        " extension failure is recorded WITHOUT clearing per-role S/W flag
+       s (R2)
+ 1701        LOOP AT gs_err_messages-messages INTO DATA(ls_msg).
+ 1702          w_log_ex-message = COND #( WHEN w_log_ex-message IS INITIAL
+ 1703                                     THEN ls_msg-message
+ 1704                                     ELSE |{ w_log_ex-message } / { ls_msg
+       -message }| ).
+ 1705        ENDLOOP.
+ 1706      ENDIF.
+ 1707      APPEND w_log_ex TO t_log_ex.
+ 1708
+ 1709      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
+ 1710      CALL FUNCTION 'BUFFER_REFRESH_ALL'.
+ 1711      REFRESH: lt_purch_func[],
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     40
+--------------------------------------------------------------------------------
+
+ 1712               ls_vendors-company_data-company[],
+ 1713               ls_vendors-purchasing_data-purchasing[],
+ 1714               gs_vmds_extern-vendors[].
+ 1715      CLEAR: wa_file_extend, gs_vmds_extern, ls_vendors, lv_vendor, busine
+       sspartner.
+ 1716    ENDLOOP.
+ 1717  ENDFORM.                                                    "FSD30 R2/R3
+ 1718
+ 1719  *&=====================================================================*
+ 1720  *&  UNIT 8  -  NEW  -  Include ZMM_VEND_MASTER_FORMS                   *
+ 1721  *&  FSD30 R1 : error-only download for the CREATE log. Builds a subset *
+ 1722  *&  of failed records (msgty 'E'/'A') and downloads it. No-op with a   *
+ 1723  *&  message when there is nothing to download.                         *
+ 1724  *&=====================================================================*
+ 1725  FORM download_error_log_cr.                                 "FSD30 R1
+ 1726    DATA: lt_err      LIKE t_log,
+ 1727          lv_filename TYPE string,
+ 1728          lv_path     TYPE string,
+ 1729          lv_fullpath TYPE string.
+ 1730
+ 1731    lt_err = VALUE #( FOR ls IN t_log WHERE ( msgty CA 'EA' ) ( ls ) ).
+ 1732    IF lt_err IS INITIAL.
+ 1733      MESSAGE 'No error records to download.' TYPE 'S'.
+ 1734      RETURN.
+ 1735    ENDIF.
+ 1736
+ 1737    cl_gui_frontend_services=>file_save_dialog(
+ 1738      EXPORTING default_extension = 'XLS'
+ 1739                default_file_name = |BP_Vendor_ERROR_Log_{ sy-datum }_{ sy
+       -uzeit }.xls|
+ 1740      CHANGING  filename = lv_filename
+ 1741                path     = lv_path
+ 1742                fullpath = lv_fullpath ).
+ 1743
+ 1744    IF lv_fullpath IS NOT INITIAL.
+ 1745      CALL FUNCTION 'GUI_DOWNLOAD'
+ 1746        EXPORTING filename              = lv_fullpath
+ 1747                  filetype              = 'ASC'
+ 1748                  write_field_separator = 'X'
+ 1749                  confirm_overwrite     = 'X'
+ 1750        TABLES    data_tab              = lt_err
+ 1751        EXCEPTIONS file_write_error = 1 OTHERS = 2.
+ 1752      IF sy-subrc = 0.
+ 1753        MESSAGE 'Error log downloaded successfully.' TYPE 'S'.
+ 1754      ENDIF.
+ 1755    ENDIF.
+ 1756  ENDFORM.                                                    "FSD30 R1
+ 1757
+ 1758
+ 1759  *&=====================================================================*
+ 1760  *&  UNIT 9  -  NEW  -  Include ZMM_VEND_MASTER_FORMS                   *
+ 1761  *&  FSD30 R1 : error-only download for the EXTEND / CHANGE log.        *
+ 1762  *&=====================================================================*
+ 1763  FORM download_error_log_ex.                                 "FSD30 R1
+ 1764    DATA: lt_err      LIKE t_log_ex,
+ 1765          lv_filename TYPE string,
+ 1766          lv_path     TYPE string,
+ 1767          lv_fullpath TYPE string.
+ 1768
+ 1769    lt_err = VALUE #( FOR ls IN t_log_ex WHERE ( msgty CA 'EA' ) ( ls ) ).
+ 1770    IF lt_err IS INITIAL.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_FORMS                 Page     41
+--------------------------------------------------------------------------------
+
+ 1771      MESSAGE 'No error records to download.' TYPE 'S'.
+ 1772      RETURN.
+ 1773    ENDIF.
+ 1774
+ 1775    cl_gui_frontend_services=>file_save_dialog(
+ 1776      EXPORTING default_extension = 'XLS'
+ 1777                default_file_name = |BP_Vendor_Ext_ERROR_Log_{ sy-datum }_
+       { sy-uzeit }.xls|
+ 1778      CHANGING  filename = lv_filename
+ 1779                path     = lv_path
+ 1780                fullpath = lv_fullpath ).
+ 1781
+ 1782    IF lv_fullpath IS NOT INITIAL.
+ 1783      CALL FUNCTION 'GUI_DOWNLOAD'
+ 1784        EXPORTING filename              = lv_fullpath
+ 1785                  filetype              = 'ASC'
+ 1786                  write_field_separator = 'X'
+ 1787                  confirm_overwrite     = 'X'
+ 1788        TABLES    data_tab              = lt_err
+ 1789        EXCEPTIONS file_write_error = 1 OTHERS = 2.
+ 1790      IF sy-subrc = 0.
+ 1791        MESSAGE 'Error log downloaded successfully.' TYPE 'S'.
+ 1792      ENDIF.
+ 1793    ENDIF.
+ 1794  ENDFORM.                                                    "FSD30 R1
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_SCR                   Page     42
+--------------------------------------------------------------------------------
+
+    1  *&---------------------------------------------------------------------*
+    2  *& Include          ZMM_VEND_MASTER_SCR
+    3  *&---------------------------------------------------------------------*
+    4  *&---------------------------------------------------------------------*
+    5  *&                SELECTION SCREEN
+    6  *&---------------------------------------------------------------------*
+    7  SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-101.
+    8    SELECTION-SCREEN BEGIN OF LINE.
+    9      PARAMETERS : rb_new RADIOBUTTON GROUP r1 USER-COMMAND uc1 DEFAULT 'X
+       '.
+   10      SELECTION-SCREEN COMMENT 4(20) TEXT-001 FOR FIELD rb_new.
+   11      PARAMETERS : rb_chg RADIOBUTTON GROUP r1.
+   12      SELECTION-SCREEN COMMENT (40) TEXT-003 FOR FIELD rb_chg.
+   13      PARAMETERS : rb_ext RADIOBUTTON GROUP r1.
+   14      SELECTION-SCREEN COMMENT (60) TEXT-002 FOR FIELD rb_ext.
+   15    SELECTION-SCREEN END OF LINE.
+   16  SELECTION-SCREEN END OF BLOCK b1.
+   17  SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-102.
+   18    PARAMETERS: p_flname TYPE localfile.
+   19  SELECTION-SCREEN END OF BLOCK b2.
+   20  SELECTION-SCREEN: BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-103.
+   21    " Defining the button on the selection screen
+   22    SELECTION-SCREEN PUSHBUTTON /2(25) btn_tpl USER-COMMAND dtl.
+   23  SELECTION-SCREEN: END OF BLOCK b3.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     43
+--------------------------------------------------------------------------------
+
+    1  *&---------------------------------------------------------------------*
+    2  *& Include          ZMM_VEND_MASTER_TOP
+    3  *&---------------------------------------------------------------------*
+    4  *&---------------------------------------------------------------------*
+    5  *&                      TABLES DECLARATION
+    6  *&---------------------------------------------------------------------*
+    7  TABLES: but000,lfa1,but020.
+    8
+    9  *&---------------------------------------------------------------------*
+   10  *&                      TYPES DECLARATION
+   11  *&---------------------------------------------------------------------*
+   12  "++ begin of changes for new template by Hemang Joshi
+   13  TYPES: BEGIN OF ty_file_bp,
+   14           bpartner               TYPE bu_partner,        "1  Business Par
+       tner Number
+   15           partn_cat              TYPE bu_type,           "2  Partner Type
+        (2=Org,1=Person)
+   16           partn_grp              TYPE bu_group,          "3  BP Grouping
+   17           title                  TYPE ad_titletx,        "4  Title
+   18           name_first             TYPE bu_nameor1,        "5  Name 1
+   19           name_last              TYPE bu_nameor2,        "6  Name 2
+   20           name_last2             TYPE bu_nameor3,        "7  Name 3
+   21           name_middle            TYPE bu_nameor4,        "8  Name 4
+   22           zz_bu_old              TYPE char20,            "9  NEW: Old Ven
+       dor Code (adjust length if you have a domain)
+   23           searchterm1            TYPE bu_sort1,          "10 Search Term
+       1
+   24           searchterm2            TYPE bu_sort2,          "11 Search Term
+       2
+   25           building               TYPE ad_bldng,          "12 BUILDING
+   26           roomnumber             TYPE ad_roomnum,        "13 ROOMNUMBER
+   27           floor                  TYPE ad_floor,          "14 FLOOR
+   28           street                 TYPE ad_street,         "15 STREET
+   29           str_suppl1             TYPE ad_strspp1,        "16 STREET1
+   30           str_suppl2             TYPE ad_strspp2,        "17 STREET2
+   31           str_suppl3             TYPE ad_strspp3,        "18 STREET3
+   32           location               TYPE ad_lctn,           "19 LOCATION
+   33           district               TYPE ad_city2,          "20 DISTRICT
+   34           home_city              TYPE ad_city3,          "21 HOME CITY
+   35           postl_cod1             TYPE ad_pstcd1,         "22 Postal Code
+   36           city                   TYPE ad_city1,          "23 City
+   37           country                TYPE land1,             "24 Country
+   38           region                 TYPE regio,             "25 Region (Gene
+       ral)
+   39           tel_number             TYPE ad_tlnmbr,         "26 Telephone nu
+       mber
+   40           mob_number             TYPE ad_tlnmbr,         "27 Mobile numbe
+       r
+   41  *  bpkind      TYPE bu_bpkind,      "28 NEW: BP Kind      "removed Note:
+        sequence changed
+   42           fax                    TYPE ad_fxnmbr,         "29 Fax Number
+   43           smtp_addr              TYPE ad_smtpadr,        "30 Email 0
+   44           valid_from             TYPE string,            "31 Valid From (
+       string; converted later)
+   45           valid_to               TYPE string,            "32 Valid To (st
+       ring; converted later)
+   46           partnertype            TYPE bu_bpkind,         "33 Partner Type
+        (free text from file)
+   47           identificationcategory TYPE string,            "34 Identificati
+       on Category
+   48           identificationnumber   TYPE string,            "35 Identificati
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     44
+--------------------------------------------------------------------------------
+
+       on Number
+   49           id_from_date           TYPE string,            "36 ID From Date
+        (string; converted later)
+   50           id_to_date             TYPE string,            "37 ID To Date (
+       string; converted later)
+   51           tel_number_3           TYPE char10,            "38 Telephone no
+       . 3
+   52           email_1                TYPE ad_smtpadr,        "39 Email 1
+   53           email_2                TYPE ad_smtpadr,        "40 Email 2
+   54           email_3                TYPE ad_smtpadr,        "41 Email 3
+   55           email_4                TYPE ad_smtpadr,        "42 Email 4
+   56           email_5                TYPE ad_smtpadr,        "42 Email 4
+   57           email_6                TYPE ad_smtpadr,        "42 Email 4
+   58           j_1iexcd               TYPE j_1iexcd,          "43 J1I Excise -
+        Dep#
+   59           j_1iexrn               TYPE j_1iexrn,          "44 J1I Excise -
+        Range
+   60           j_1iexrg               TYPE j_1iexrg,          "45 J1I Excise -
+        Division
+   61           j_1iexdi               TYPE j_1iexdi,          "46 J1I Excise -
+        District
+   62           j_1iexco               TYPE j_1iexco,          "47 J1I Excise -
+        Commissionerate
+   63           j_1ivtyp               TYPE j_1ivtyp,          "48 J1I Vendor T
+       ype
+   64           kunnr                  TYPE kna1-kunnr,        "49 Customer Num
+       ber (moved from old #9)
+   65           j_1ipanno              TYPE j_1ipanno,         "50 PAN
+   66           j_1isern               TYPE j_1isern,          "51 Service Tax
+       Registration
+   67           taxtype                TYPE dfkkbptaxnum-taxtype, "52 BP Tax Nu
+       mber Category
+   68           stcd3                  TYPE stcd3,             "53 GST No.
+   69           ven_class              TYPE char10,            "54 Vendor Class
+   70           isec                   TYPE bus_bupa_industry_sectors-isec, "55
+        Industry Sector
+   71           time_zone              TYPE char10,            "56 Time Zone
+   72
+   73           " Company Code 57..65
+   74           bukrs                  TYPE lfb1-bukrs,        "57 Company Code
+   75           akont                  TYPE akont,             "58 Recon Accoun
+       t
+   76           zuawa                  TYPE dzuawa,            "59 Sort Key
+   77           altkn                  TYPE lfb1-altkn,        "60 Previous Acc
+       ount Number
+   78           mindk                  TYPE mindk,             "61 Minority Ind
+       icator
+   79           cerdt                  TYPE string,            "62 Certificatio
+       n Date (string; converted later)  "char10 --> string
+   80           zterm                  TYPE dzterm,            "63 Payment Term
+       s
+   81           reprf                  TYPE reprf,             "64 Double Invoi
+       ce Check
+   82           kverm                  TYPE kverm,             "65 Account Memo
+        / Check Flag
+   83
+   84           " Payment (House Bank ID) 66
+   85           hbkid                  TYPE hbkid,             "66 NEW: House B
+       ank ID
+   86
+   87           " Purchasing 67..87
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     45
+--------------------------------------------------------------------------------
+
+   88           ekorg                  TYPE ekorg,             "67 Purchasing O
+       rganization
+   89           waers                  TYPE waers,             "68 Currency
+   90           zterm_org              TYPE dzterm,            "69 Payment Term
+       s (Purchasing)
+   91           verkf                  TYPE verkf,             "70 Responsible
+       Salesperson
+   92           inco1                  TYPE inco1,             "71 Incoterms Pa
+       rt 1
+   93           inco1_l                TYPE inco2_l,           "72 Incoterms Lo
+       cation 1
+   94           inco2                  TYPE inco2,             "73 Incoterms Pa
+       rt 2
+   95           inco2_l                TYPE inco3_l,           "74 Incoterms Lo
+       cation 2
+   96           webre                  TYPE webre,             "75 GR-based IV
+   97           lebre                  TYPE lebre,             "76 Service-base
+       d IV
+   98           kzaut                  TYPE kzaut,             "77 Automatic PO
+        Allowed
+   99           lfabc                  TYPE lfabc,             "78 ABC Indicato
+       r
+  100           stenr                  TYPE stenr,             "79 TAN Number
+  101           profs                  TYPE profs,             "80 MSME Number
+  102           j_1kftind              TYPE indtyp,            "81 Type of Indu
+       stry
+  103           j_1kftbus              TYPE gestyp,            "82 Type of Busi
+       ness
+  104           bahns                  TYPE bahns,             "83 Train Statio
+       n (CIN)
+  105           telf1                  TYPE telf1,             "84 Supplier Tel
+       ephone No.
+  106           ekgrp                  TYPE ekgrp,             "85 Purchasing G
+       roup
+  107           kalsk                  TYPE kalsk,             "86 Schema Group
+  108           parvw                  TYPE parvw,             "87 NEW: Partner
+        Function (Purchasing override)
+  109
+  110           " Payment / Bank 88..100
+  111           banks                  TYPE banks,             "88 Bank Country
+       /Region Key
+  112           bank_id                TYPE bu_bkvid,          "89 BP Bank ID
+  113           bankl                  TYPE bankl,             "90 Bank Key
+  114           bankn                  TYPE bankn,             "91 Bank Account
+        Number
+  115           bkref                  TYPE bkref,             "92 Remaining Ba
+       nk Account No.
+  116           koinh                  TYPE koinh_fi,          "93 Account Hold
+       er Name
+  117           ebpp_accname           TYPE ebpp_accname,      "94 User-defined
+        Bank Account Name
+  118           banka                  TYPE banka,             "95 Name of Fina
+       ncial Institution
+  119           region_1               TYPE regio,             "96 Bank Region
+       (second REGIO)
+  120           street_1               TYPE bnka-stras,        "97 Bank Street
+  121           city_1                 TYPE ort01,             "98 Bank City
+  122           brnch                  TYPE brnch,             "99 Branch
+  123           swift                  TYPE bnka-swift,        "100 Swift Code
+  124
+  125           " Other / Log / Keys 101..103
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     46
+--------------------------------------------------------------------------------
+
+  126           reason                 TYPE char100,           "101 Reason
+  127           lifnr                  TYPE lifnr,             "102 Vendor Numb
+       er
+  128           flag                   TYPE c,                 "103 Flag
+  129
+  130           " Withholding 104..114
+  131           srno                   TYPE char4,             "104 WHT SRNO (g
+       roup key)
+  132           witht                  TYPE witht,             "105 Withholding
+        Tax Type
+  133           wt_subjct              TYPE wt_subjct,         "106 Subject to
+       WHT?
+  134           qsrec                  TYPE wt_qsrec,          "107 Type of Rec
+       ipient
+  135           wt_wtstcd              TYPE wt_wtstcd,         "108 WHT Identif
+       ication Number
+  136           wt_withcd              TYPE wt_withcd,         "109 WHT Code
+  137           wt_exnr                TYPE wt_exnr,           "110 Exemption C
+       ertificate Number
+  138           wt_exrt                TYPE wt_exrt,           "111 Exemption R
+       ate
+  139           wt_exdf                TYPE string,            "112 Exemption F
+       rom Date
+  140           wt_exdt                TYPE string,            "113 Exemption T
+       o Date
+  141           wt_wtexrs              TYPE wt_wtexrs,         "114 Reason for
+       Exemption
+  142           paymethod              TYPE lfb1-zwels,        "115 Payment Met
+       hod
+  143           controlkey             TYPE lfbk-bkont,        "116 Control Key
+  144         END OF ty_file_bp.
+  145  TYPES: BEGIN OF ty_log.
+  146           INCLUDE TYPE ty_file_bp.
+  147  TYPES:   msgty   TYPE bapi_mtype,
+  148           message TYPE string,
+  149           rowno   TYPE i,          "FSD30 R1 row number in file
+  150           stat_cc TYPE bapi_mtype, "FSD30 R2 Company Code ext status
+  151           stat_po TYPE bapi_mtype, "FSD30 R2 Purch Org  ext status
+  152         END OF ty_log.
+  153  "-- end of changes for new template by Hemang Joshi
+  154
+  155
+  156  TYPES : BEGIN OF ty_file_extend,
+  157            bpartner TYPE  bu_partner,
+  158  ***COMPANY CODE DATA
+  159            bukrs    TYPE lfb1-bukrs,
+  160            akont    TYPE akont, "RECON ACCOUNT
+  161            zuawa    TYPE dzuawa, "SORT KEY
+  162            mindk    TYPE mindk,
+  163            cerdt    TYPE char10, "CERDT,
+  164            zterm    TYPE dzterm,
+  165            reprf    TYPE reprf,
+  166  ***PRCHASE ORAGANISATION****
+  167            ekorg    TYPE ekorg,
+  168            waers    TYPE waers,
+  169            verkf    TYPE verkf,
+  170            telf1    TYPE telf1,
+  171            ekgrp    TYPE ekgrp,
+  172            kalsk    TYPE kalsk,
+  173          END OF ty_file_extend.
+  174
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     47
+--------------------------------------------------------------------------------
+
+  175  TYPES: BEGIN OF ty_file_vendor,
+  176           lifnr TYPE lifnr,
+  177         END OF ty_file_vendor.
+  178
+  179  TYPES: BEGIN OF ty_lfa1,
+  180           lifnr TYPE lfa1-lifnr,
+  181           ktokk TYPE lfa1-ktokk,
+  182         END OF ty_lfa1.
+  183
+  184  TYPES: BEGIN OF ty_upload,
+  185           client   TYPE mandt, " CLNT  3 0 CLIENT
+  186           partner  TYPE bu_partner , "CHAR  10  0 BUSINESS PARTNER NUMBER
+  187           taxtype  TYPE bptaxtype,  "CHAR 4 0 TAX NUMBER CATEGORY
+  188           taxnum   TYPE bptaxnum , "CHAR  20  0 BUSINESS PARTNER TAX NUMB
+       ER
+  189           taxnumxl TYPE bptaxnumxl, "  CHAR  60  0 BUSINESS PARTNER TAX N
+       UMBER
+  190         END OF ty_upload.
+  191
+  192  TYPES: BEGIN OF ty_msg,
+  193           partner TYPE bu_partner,
+  194           name    TYPE lfa1-name1,
+  195           reason  TYPE string,
+  196         END OF ty_msg.
+  197
+  198  TYPES: BEGIN OF ty_log_ex.
+  199           INCLUDE TYPE ty_file_extend.
+  200  TYPES:   msgty   TYPE bapi_mtype,
+  201           message TYPE string,
+  202           rowno   TYPE i,          "FSD30 R1
+  203           stat_cc TYPE bapi_mtype, "FSD30 R2
+  204           stat_po TYPE bapi_mtype, "FSD30 R2
+  205         END OF ty_log_ex.
+  206  *&---------------------------------------------------------------------*
+  207  *&                INTERNAL TABLE & WORK AREA DECLARATION
+  208  *&---------------------------------------------------------------------*
+  209  DATA: gt_raw     TYPE solix_tab,
+  210        gv_bin_len TYPE i.
+  211  DATA: it_file        TYPE TABLE OF ty_file_bp,
+  212        it_file_all    TYPE TABLE OF ty_file_bp,
+  213        wa_file        TYPE ty_file_bp,
+  214        t_error        TYPE TABLE OF ty_file_bp,
+  215        t_log          TYPE TABLE OF ty_log, "TY_LOG,
+  216        w_log          TYPE ty_log, "TY_LOG.
+  217        t_log_ex       TYPE TABLE OF ty_log_ex,
+  218        w_log_ex       TYPE ty_log_ex,
+  219        t_msg          TYPE STANDARD TABLE OF ty_msg,
+  220        w_msg          TYPE ty_msg,
+  221        t_filev        TYPE TABLE OF ty_file_vendor,
+  222        w_filev        TYPE ty_file_vendor,
+  223        wa             TYPE ty_file_vendor,
+  224        t_lfa1         TYPE STANDARD TABLE OF ty_lfa1,
+  225        w_lfa1         TYPE ty_lfa1,
+  226        it_raw         TYPE truxs_t_text_data,
+  227        wa_bnka        TYPE bnka,
+  228        wa_final_2     TYPE ty_upload,
+  229        wa_final_3     TYPE lfb1,
+  230        wa_final_5     TYPE lfm1,
+  231        " Added by kedar Subrat On 25.09.2019 for extend CC data & Pur. Or
+       g. Data
+  232        it_file_extend TYPE STANDARD TABLE OF ty_file_extend,
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     48
+--------------------------------------------------------------------------------
+
+  233        wa_file_extend TYPE ty_file_extend.
+  234  " Ended by kedar Subrat On 25.09.2019 for extend CC data & Pur. Org. Dat
+       a
+  235  *&---------------------------------------------------------------------*
+  236  *&                LOCAL AND GLOBAL VAIABLE DECLARATION
+  237  *&---------------------------------------------------------------------*
+  238  DATA : lv_flag,
+  239         lv_vendor TYPE lfa1-lifnr,
+  240         lv_length TYPE i.                    "Yashveer 19.10.2019
+  241  *       LE_DATA  TYPE REF TO LCL_DATA_1.
+  242  *&---------------------------------------------------------------------*
+  243  *&           LOCAL AND GLOBAL VAIABLE FOR ID NUMBER DECLARATION
+  244  *&---------------------------------------------------------------------*
+  245  DATA : lv_id_from_date            TYPE string, "BU_ID_VALID_DATE_FROM,
+  246         lv_id_to_date              TYPE string, "BU_ID_VALID_DATE_TO,
+  247         lv1_id_from_date           TYPE string,
+  248         lv2_id_from_date           TYPE string,
+  249         lv1_id_to_date             TYPE string,
+  250         lv2_id_to_date             TYPE string,
+  251         lv1_identificationcategory TYPE bapibus1006_identification_key-id
+       entificationcategory,
+  252         lv2_identificationcategory TYPE string,
+  253         lv1_identificationnumber   TYPE bapibus1006_identification_key-id
+       entificationnumber,
+  254         lv2_identificationnumber   TYPE string.
+  255  *&---------------------------------------------------------------------*
+  256  *&                BP RELATED DATA DECLARATION
+  257  *&---------------------------------------------------------------------*
+  258  DATA: iv_partner                  TYPE bu_partner,
+  259        wa_but000                   TYPE but000,
+  260        wa_lfa1                     TYPE lfa1,
+  261        partner_change              TYPE flag,
+  262        businesspartnerextern       TYPE bapibus1006_head-bpartner,
+  263        partnercategory             TYPE bapibus1006_head-partn_cat,
+  264        partnergroup                TYPE bapibus1006_head-partn_grp,
+  265        centraldata                 TYPE bapibus1006_central,
+  266        centraldatax                TYPE bapibus1006_central_x,
+  267        central_group               TYPE bapibus1006_central_group,
+  268        central_groupx              TYPE bapibus1006_central_group_x,
+  269        centraldataperson           TYPE bapibus1006_central_person,
+  270        centraldatapersonx          TYPE bapibus1006_central_person_x,
+  271        centraldataorganization     TYPE bapibus1006_central_organ,
+  272        centraldataorganizationx    TYPE bapibus1006_central_organ_x,
+  273        centraldatagroup            TYPE bapibus1006_central_group,
+  274        addressdata                 TYPE bapibus1006_address,
+  275        industries                  TYPE bapibus1006_industrysector,
+  276        businesspartner             TYPE bapibus1006_head-bpartner,
+  277        it_telephondata             TYPE STANDARD TABLE OF bapiadtel,
+  278        wa_telephondata             TYPE bapiadtel,
+  279        it_maildata                 TYPE STANDARD TABLE OF bapiadsmtp,
+  280        wa_maildata                 TYPE bapiadsmtp,
+  281        industrysector              LIKE bapibus1006_industrysector-indust
+       rysector,
+  282        identification              LIKE bapibus1006_identification,
+  283        defaultindustry             LIKE bapibus1006_industrysector-defaul
+       tindustrysector,
+  284        defaultindustry_x           LIKE bapibus1006_industrysector_x,
+  285        industrysectorkeysystem     LIKE bapibus1006_industrysector-indust
+       rysectorkeysystem,
+  286        industrysectordetail        TYPE STANDARD TABLE OF bapibus1006_ind
+       ustrysector,
+--------------------------------------------------------------------------------
+21.07.26 DEV      Include ZMM_VEND_MASTER_TOP                   Page     49
+--------------------------------------------------------------------------------
+
+  287        l_partner                   TYPE bapibus1006_head-bpartner,
+  288        it_faxdata                  TYPE STANDARD TABLE OF bapiadfax,
+  289        wa_faxdata                  TYPE bapiadfax,
+  290        return                      TYPE STANDARD TABLE OF bapiret2,
+  291        x_save_add                  TYPE bapi4001_1,
+  292        chk_address                 TYPE bapibus1006_address,
+  293        businesspartnerrolecategory TYPE bapibus1006_bproles-partnerroleca
+       tegory,
+  294        all_businesspartnerroles    TYPE bapibus1006_x-mark,
+  295        businesspartnerrole         TYPE bapibus1006_bproles-partnerrole,
+  296        differentiationtypevalue    TYPE bapibus1006_bproles-difftypevalue
+       ,
+  297        validfromdate               TYPE bapibus1006_bprole_validity-bprol
+       evalidfrom,
+  298        validuntildate              TYPE bapibus1006_bprole_validity-bprol
+       evalidto.
+  299  *&---------------------------------------------------------------------*
+  300  *&           Company Code Extend Related  DATA DECLARATION
+  301  *&---------------------------------------------------------------------*
+  302  DATA: lt_vendors               TYPE vmds_ei_extern_t,
+  303        ls_vendors               TYPE vmds_ei_extern,
+  304        ls_central               TYPE vmds_ei_vmd_central,
+  305        lt_company               TYPE vmds_ei_company_t,
+  306        ls_company               TYPE vmds_ei_company,
+  307        ls_company_data          TYPE vmds_ei_vmd_company,
+  308        is_master_data           TYPE vmds_ei_main,
+  309        ls_address               TYPE cvis_ei_address1,
+  310        es_master_data_correct   TYPE vmds_ei_main,
+  311        es_message_correct       TYPE cvis_message,
+  312        es_master_data_defective TYPE vmds_ei_main,
+  313        es_message_defective     TYPE cvis_message.
+  314  *&---------------------------------------------------------------------*
+  315  *&           Purchasing Data Extend Related  DATA DECLARATION
+  316  *&---------------------------------------------------------------------*
+  317  DATA: lt_purchasing     TYPE vmds_ei_purchasing_t,
+  318        ls_purchasing     TYPE vmds_ei_purchasing,
+  319        lt_purch_func     TYPE vmds_ei_functions_t,
+  320        ls_purch_func     TYPE vmds_ei_functions,
+  321        ls_purch_fun_data TYPE vmds_ei_vmd_functions,
+  322        ls_purchas_data   TYPE vmds_ei_vmd_purchasing,
+  323        iv_ktokd          TYPE ktokd,
+  324        et_parvw          TYPE cmds_parvw_t.
+  325  DATA: gs_vmds_extern   TYPE vmds_ei_main,
+  326        gs_succ_messages TYPE cvis_message,
+  327        gs_vmds_error    TYPE vmds_ei_main,
+  328        gs_err_messages  TYPE cvis_message,
+  329        gs_vmds_succ     TYPE vmds_ei_main,
+  330        gv_ktokk         TYPE ktokk,
+  331        gv_ccode         TYPE bukrs,
+  332        gv_akont         TYPE akont,
+  333        gv_name          TYPE name1.
+  334  *&---------------------------------------------------------------------*
+  335  *&                ALV RELATED DATA DECLARATION
+  336  *&---------------------------------------------------------------------*
+  337  DATA: t_fcat   TYPE slis_t_fieldcat_alv,
+  338        w_fcat   TYPE slis_fieldcat_alv,
+  339        s_layout TYPE slis_layout_alv.
+--------------------------------------------------------------------------------
+21.07.26 DEV      Program ZMM_VEND_MASTER text e                Page     50
+--------------------------------------------------------------------------------
+
+Title:
+   Mass Vendor Upload
+
+--------------------------------------------------------------------------------
+Text elements:
+
+001   Create/Extend Vendor
+002   Extend for New Comp Code & New Pur Org
+003   Future Feature
+101   Select Radio Button
+102   Uplaod File
+103   Download
+
+
+--------------------------------------------------------------------------------
+Selection texts:
+
+P_FLNAME
+        File Name
+RB_EXT
+        Extend for Comp Code & Pur Org
+RB_NEW
+        Create Vendor
+--------------------------------------------------------------------------------
+21.07.26 DEV      Internal Program Environment ZMM_VEND_MASTER  Page     51
+--------------------------------------------------------------------------------
+
+Subroutines:                                                  Line  Page
+
+ADD_VENDOR_ROLES.............. ZMM_VEND_MASTER_FORMS           344    15
+                               ZMM_VEND_MASTER_FORMS           602    20
+                               ZMM_VEND_MASTER_FORMS          1345    33
+CALL_BAPI_BUPA_CENTRAL_CHANGE. ZMM_VEND_MASTER_FORMS           337    15
+                               ZMM_VEND_MASTER_FORMS          1214    31
+                               ZMM_VEND_MASTER_FORMS          1340    33
+CALL_BAPI_BUPA_CREATE......... ZMM_VEND_MASTER_FORMS           335    15
+                               ZMM_VEND_MASTER_FORMS           538    19
+CHANGE_BP_VENDOR.............. ZMM_VEND_MASTER_FORMS          1316    32
+CONVERT_DATA_CR............... ZMM_VEND_MASTER                  87     3
+                               ZMM_VEND_MASTER_FORMS           145    11
+CONVERT_DATA_EX............... ZMM_VEND_MASTER                  96     3
+                               ZMM_VEND_MASTER                 104     3
+                               ZMM_VEND_MASTER_FORMS           217    13
+CREATE_BP_VENDOR.............. ZMM_VEND_MASTER                  89     3
+                               ZMM_VEND_MASTER_FORMS           289    14
+DISPLAY_LOG................... ZMM_VEND_MASTER                  92     3
+                               ZMM_VEND_MASTER_FORMS          1015    27
+DISPLAY_LOG_EX................ ZMM_VEND_MASTER                 100     3
+                               ZMM_VEND_MASTER                 109     3
+                               ZMM_VEND_MASTER_FORMS          1094    28
+DOWNLOAD_ERROR_LOG_CR......... ZMM_VEND_MASTER                  91     3
+                               ZMM_VEND_MASTER_FORMS          1725    40
+DOWNLOAD_ERROR_LOG_EX......... ZMM_VEND_MASTER                  99     3
+                               ZMM_VEND_MASTER                 108     3
+                               ZMM_VEND_MASTER_FORMS          1763    40
+DOWNLOAD_LOG_TO_EXCEL......... ZMM_VEND_MASTER_FORMS           975    26
+DOWNLOAD_LOG_TO_EXCEL_EX...... ZMM_VEND_MASTER_FORMS          1054    28
+DOWNLOAD_TEMPLATE............. ZMM_VEND_MASTER                  44     2
+                               ZMM_VEND_MASTER_FORMS             4     9
+EXTEND_BP..................... ZMM_VEND_MASTER                  97     3
+                               ZMM_VEND_MASTER                 106     3
+                               ZMM_VEND_MASTER_FORMS          1534    36
+FILL_ADDRESS_VENDOR........... ZMM_VEND_MASTER_FORMS           321    14
+                               ZMM_VEND_MASTER_FORMS           452    17
+FILL_CENTRAL_DATA_VENDOR...... ZMM_VEND_MASTER_FORMS           320    14
+                               ZMM_VEND_MASTER_FORMS           422    16
+TOP_OF_PAGE................... ZMM_VEND_MASTER_FORMS          1163    30
+TOP_OF_PAGE_EX................ ZMM_VEND_MASTER_FORMS          1190    30
+UPLOAD_BANK_TO_BP............. ZMM_VEND_MASTER_CL              275     8
+                               ZMM_VEND_MASTER_FORMS           722    22
+UPLOAD_EXCEL.................. ZMM_VEND_MASTER                  84     3
+                               ZMM_VEND_MASTER_FORMS           105    11
+USER_COMMAND.................. ZMM_VEND_MASTER_FORMS          1131    29
+VALIDATE_CHANGE............... ZMM_VEND_MASTER                 105     3
+                               ZMM_VEND_MASTER_FORMS          1485    35
+VALIDATE_CREATE............... ZMM_VEND_MASTER                  88     3
+                               ZMM_VEND_MASTER_FORMS          1406    34
+VALUE_REQUEST................. ZMM_VEND_MASTER                  51     2
+                               ZMM_VEND_MASTER_FORMS            90    11
+--------------------------------------------------------------------------------
+
+Messages:
+
+                                                              Line  Page
+
+?............................. ZMM_VEND_MASTER_FORMS          1003    27
+?............................. ZMM_VEND_MASTER_FORMS          1082    28
+?............................. ZMM_VEND_MASTER_FORMS          1733    40
+--------------------------------------------------------------------------------
+21.07.26 DEV      Internal Program Environment ZMM_VEND_MASTER  Page     52
+--------------------------------------------------------------------------------
+
+?............................. ZMM_VEND_MASTER_FORMS          1753    40
+?............................. ZMM_VEND_MASTER_FORMS          1771    41
+?............................. ZMM_VEND_MASTER_FORMS          1791    41
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+21.07.26 DEV      Internal Program Environment ZMM_VEND_MASTER  Page     53
+--------------------------------------------------------------------------------
+
+External calls
+
+
+Function Modules                                              Line  Page
+
+BAPI_BANK_CREATE.............. ZMM_VEND_MASTER_FORMS           739    22
+BAPI_BUPA_CENTRAL_CHANGE...... ZMM_VEND_MASTER_FORMS          1241    31
+BAPI_BUPA_CREATE_FROM_DATA.... ZMM_VEND_MASTER_FORMS           541    19
+BAPI_BUPA_ROLE_ADD_2.......... ZMM_VEND_MASTER_FORMS           612    20
+BAPI_IDENTIFICATION_ADD....... ZMM_VEND_MASTER_FORMS           683    21
+BAPI_INDUSTRYSECTOR_ADD....... ZMM_VEND_MASTER_FORMS           635    20
+BAPI_TRANSACTION_COMMIT....... ZMM_VEND_MASTER_FORMS           417    16
+                               ZMM_VEND_MASTER_FORMS           565    19
+                               ZMM_VEND_MASTER_FORMS           621    20
+                               ZMM_VEND_MASTER_FORMS           651    21
+                               ZMM_VEND_MASTER_FORMS           704    22
+                               ZMM_VEND_MASTER_FORMS          1261    31
+                               ZMM_VEND_MASTER_FORMS          1392    34
+                               ZMM_VEND_MASTER_FORMS          1709    39
+BUFFER_REFRESH_ALL............ ZMM_VEND_MASTER_FORMS           418    16
+                               ZMM_VEND_MASTER_FORMS          1393    34
+                               ZMM_VEND_MASTER_FORMS          1710    39
+BUPA_BANKDETAILS_GET.......... ZMM_VEND_MASTER_FORMS           772    23
+BUPA_BANKDETAIL_ADD........... ZMM_VEND_MASTER_FORMS           784    23
+CONVERSION_EXIT_ALPHA_INPUT... ZMM_VEND_MASTER_FORMS           308    14
+                               ZMM_VEND_MASTER_FORMS          1325    32
+                               ZMM_VEND_MASTER_FORMS          1546    36
+                               ZMM_VEND_MASTER_FORMS          1596    37
+CONVERT_DATE_TO_INTERNAL...... ZMM_VEND_MASTER_FORMS           664    21
+                               ZMM_VEND_MASTER_FORMS           674    21
+F4_FILENAME................... ZMM_VEND_MASTER_FORMS            91    11
+GUI_DOWNLOAD.................. ZMM_VEND_MASTER_FORMS            74    10
+                               ZMM_VEND_MASTER_FORMS           990    27
+                               ZMM_VEND_MASTER_FORMS          1069    28
+                               ZMM_VEND_MASTER_FORMS          1745    40
+                               ZMM_VEND_MASTER_FORMS          1783    41
+GUI_UPLOAD.................... ZMM_VEND_MASTER_FORMS           110    11
+REUSE_ALV_COMMENTARY_WRITE.... ZMM_VEND_MASTER_FORMS          1183    30
+                               ZMM_VEND_MASTER_FORMS          1210    31
+REUSE_ALV_GRID_DISPLAY........ ZMM_VEND_MASTER_FORMS          1033    27
+                               ZMM_VEND_MASTER_FORMS          1109    29
+SCMS_BINARY_TO_XSTRING........ ZMM_VEND_MASTER_FORMS           159    12
+                               ZMM_VEND_MASTER_FORMS           231    13
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+21.07.26 DEV      Internal Program Environment ZMM_VEND_MASTER  Page     54
+--------------------------------------------------------------------------------
+
+DATABASE OPERATIONS
+
+
+SELECT:                                                       Line  Page
+
+BNKA.......................... ZMM_VEND_MASTER_FORMS           734    22
+BUT000........................ ZMM_VEND_MASTER_FORMS           327    15
+                               ZMM_VEND_MASTER_FORMS           347    15
+                               ZMM_VEND_MASTER_FORMS           366    15
+                               ZMM_VEND_MASTER_FORMS          1334    33
+                               ZMM_VEND_MASTER_FORMS          1348    33
+                               ZMM_VEND_MASTER_FORMS          1367    33
+                               ZMM_VEND_MASTER_FORMS          1499    36
+                               ZMM_VEND_MASTER_FORMS          1550    36
+                               ZMM_VEND_MASTER_FORMS          1561    37
+BUT020........................ ZMM_VEND_MASTER_FORMS           358    15
+                               ZMM_VEND_MASTER_FORMS          1359    33
+CVI_VEND_LINK................. ZMM_VEND_MASTER_FORMS          1564    37
+DFKKBPTAXNUM.................. ZMM_VEND_MASTER_FORMS          1449    35
+LFA1.......................... ZMM_VEND_MASTER_FORMS           354    15
+                               ZMM_VEND_MASTER_FORMS           360    15
+                               ZMM_VEND_MASTER_FORMS          1355    33
+                               ZMM_VEND_MASTER_FORMS          1361    33
+                               ZMM_VEND_MASTER_FORMS          1567    37
+                               ZMM_VEND_MASTER_FORMS          1569    37
+LFB1.......................... ZMM_VEND_MASTER_FORMS          1582    37
+LFM1.......................... ZMM_VEND_MASTER_FORMS          1627    38
+T001.......................... ZMM_VEND_MASTER_FORMS          1430    34
+T024E......................... ZMM_VEND_MASTER_FORMS          1436    34
+WYT3.......................... ZMM_VEND_MASTER_CL              228     7
+                               ZMM_VEND_MASTER_FORMS          1666    39
+--------------------------------------------------------------------------------
+
+
+UPDATE:                                                       Line  Page
+
+BNKA.......................... ZMM_VEND_MASTER_FORMS           760    23
+LFA1.......................... ZMM_VEND_MASTER_FORMS           372    15
+                               ZMM_VEND_MASTER_FORMS          1372    33
+--------------------------------------------------------------------------------
+
+
+MODIFY:                                                       Line  Page
+
+DFKKBPTAXNUM.................. ZMM_VEND_MASTER_FORMS           572    19
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+21.07.26 DEV      Internal Program Environment ZMM_VEND_MASTER  Page     55
+--------------------------------------------------------------------------------
+
+INTERNAL TABLE OPERATIONS
+
+
+READ TABLE:                                                   Line  Page
+
+LT_WORKSHEETS................. ZMM_VEND_MASTER_FORMS           184    12
+                               ZMM_VEND_MASTER_FORMS           256    13
+T_LFA1........................ ZMM_VEND_MASTER_CL              148     6
+--------------------------------------------------------------------------------
