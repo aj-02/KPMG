@@ -1,0 +1,4917 @@
+21.07.26DEV ProgramZMM_VEND_MASTERattrib Page 1
+Createdon....11.12.2025 Lastchangedon/by........31.03.2026UDAYABAP01
+Author........UDAYABAP01
+Title.........MassVendorUpload
+Type..................1 Reporting
+Status................
+Application...........
+Class.................
+Logicaldatabase......
+fromApplication....
+Selectionscreen......
+Authorizationgroup...
+Package...............ZMM_ABAP
+StartbyVariants
+Deactivateeditorlock
+XFixedpointarithmeticactive
+21.07.26DEV ProgramZMM_VEND_MASTER Page 2
+1 *& *
+2 *&ReportZMM_VEND_MASTER
+3 *& *
+4 * MODULE:MaterialManagement *
+5 * *
+6 * Objective:VENDORMASTERCREATE *
+7 * Program :UpdatesTables(X) Downloadsdata( ) *
+8 * OutputsList ( ) *
+9 * *
+10 * *
+11 * DateCreated: 10.12.2025 *
+12 * Instructedby: KPMG-JunaidKhan *
+13 * Devlopedby: KPMG-JayprakashTiwari *
+14 * *
+15 * *
+16 * ExternalDependencies *
+17 * *
+18 * *
+19 * *
+20 *AmendmentHistory *
+21 * *
+22 *VersionCreate/ChangeOwner TR CR/ID *
+23 *......................................................................*
+24 *<001> JayprakashTiwari DEVK900394 *
+25 *Reason:Massvendorupload *
+26 *......................................................................*
+27 *<002> *
+28 *Reason: *
+29 * *
+30 REPORTzmm_vend_master.
+31
+32 INCLUDEzmm_vend_master_top.
+33 INCLUDEzmm_vend_master_scr.
+34 INCLUDEzmm_vend_master_cl.
+35 INCLUDEzmm_vend_master_forms.
+36
+37 INITIALIZATION.
+38 "Settingbuttontextandoptionalicon
+39 btn_tpl='@49@DownloadTemplate'.
+40
+41 ATSELECTION-SCREEN.
+42 CASEsy-ucomm.
+43 WHEN'DTL'."User-commandassignedtothebutton
+44 PERFORMdownload_template.
+45 ENDCASE.
+46
+47 *& *
+48 *& SEARCHHELP
+49 *& *
+50 ATSELECTION-SCREENONVALUE-REQUESTFORp_flname.
+51 PERFORMvalue_request.
+"VALUEREQUESTFORFILE
+52 *& *
+53 *& STARTOFSELECTION
+54 *& *
+55 START-OF-SELECTION.
+56 **** PERFORMvalidations.
+57 *& *
+58 *& CREATEBUSINESSPARTNER
+59 *& *
+60 CLEAR:lv_flag.
+21.07.26
+DEV
+Program ZMM_VEND_MASTER
+Page
+3
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+PERFORM upload_excel.
+IF rb_new = 'X'.
+PERFORM convert_data_cr.
+PERFORM create_bp_vendor.
+RTNER WITH VENDOR ROLES
+IF t_log IS NOT INITIAL.
+"CREATE BUSINESS PA
+PERFORM download_log_to_excel. " Saves file first
+PERFORM display_log.
+ENDIF.
+ELSEIF rb_ext = 'X'.
+PERFORM convert_data_ex.
+PERFORM extend_bp.
+IF t_log_ex IS NOT INITIAL.
+" Then shows result on screen
+PERFORM download_log_to_excel_ex. " Saves file first
+PERFORM display_log_ex.
+ENDIF.
+76 **** ELSEIF rb_chg = 'X'.
+77 **** PERFORM convert_data_ex.
+78 **** PERFORM change_bp_vendor.
+79
+ENDIF.
+" Then shows result on screen
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 4
+1 *& *
+2 *&Include ZMM_VEND_MASTER_TOP
+3 *& *
+4 *& *
+5 *& TABLESDECLARATION
+6 *& *
+7 TABLES:but000,lfa1,but020.
+8
+9 *& *
+10 *& TYPESDECLARATION
+11 *& *
+12 "++beginofchangesfornewtemplatebyHemangJoshi
+13 TYPES:BEGINOFty_file_bp,
+14 bpartner TYPEbu_partner, "1 BusinessPar
+tnerNumber
+15 partn_cat TYPEbu_type, "2 PartnerType
+(2=Org,1=Person)
+16 partn_grp TYPEbu_group, "3 BPGrouping
+17 title TYPEad_titletx, "4 Title
+18 name_first TYPEbu_nameor1, "5 Name1
+19 name_last TYPEbu_nameor2, "6 Name2
+20 name_last2 TYPEbu_nameor3, "7 Name3
+21 name_middle TYPEbu_nameor4, "8 Name4
+22 zz_bu_old TYPEchar20, "9 NEW:OldVen
+dorCode(adjustlengthifyouhaveadomain)
+23 searchterm1 TYPEbu_sort1, "10SearchTerm
+1
+24 searchterm2 TYPEbu_sort2, "11SearchTerm
+2
+25 building TYPEad_bldng, "12BUILDING
+26 roomnumber TYPEad_roomnum, "13ROOMNUMBER
+27 floor TYPEad_floor, "14FLOOR
+28 street TYPEad_street, "15STREET
+29 str_suppl1 TYPEad_strspp1, "16STREET1
+30 str_suppl2 TYPEad_strspp2, "17STREET2
+31 str_suppl3 TYPEad_strspp3, "18STREET3
+32 location TYPEad_lctn, "19LOCATION
+33 district TYPEad_city2, "20DISTRICT
+34 home_city TYPEad_city3, "21HOMECITY
+35 postl_cod1 TYPEad_pstcd1, "22PostalCode
+36 city TYPEad_city1, "23City
+37 country TYPEland1, "24Country
+38 region TYPEregio, "25Region(Gene
+ral)
+39 tel_number TYPEad_tlnmbr, "26Telephonenu
+mber
+40 mob_number TYPEad_tlnmbr, "27Mobilenumbe
+r
+41 * bpkind TYPEbu_bpkind, "28NEW:BPKind "removedNote:
+sequencechanged
+42 fax TYPEad_fxnmbr, "29FaxNumber
+43 smtp_addr TYPEad_smtpadr, "30Email0
+44 valid_from TYPEstring, "31ValidFrom(
+string;convertedlater)
+45 valid_to TYPEstring, "32ValidTo(st
+ring;convertedlater)
+46 partnertype TYPEbu_bpkind, "33PartnerType
+(freetextfromfile)
+47 identificationcategoryTYPEstring, "34Identificati
+onCategory
+48 identificationnumber TYPEstring, "35Identificati
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 5
+onNumber
+49 id_from_date TYPEstring, "36IDFromDate
+(string;convertedlater)
+50 id_to_date TYPEstring, "37IDToDate(
+string;convertedlater)
+51 tel_number_3 TYPEchar10, "38Telephoneno
+.3
+52 email_1 TYPEad_smtpadr, "39Email1
+53 email_2 TYPEad_smtpadr, "40Email2
+54 email_3 TYPEad_smtpadr, "41Email3
+55 email_4 TYPEad_smtpadr, "42Email4
+56 email_5 TYPEad_smtpadr, "42Email4
+57 email_6 TYPEad_smtpadr, "42Email4
+58 j_1iexcd TYPEj_1iexcd, "43J1IExcise
+Dep#
+59 j_1iexrn TYPEj_1iexrn, "44J1IExcise
+Range
+60 j_1iexrg TYPEj_1iexrg, "45J1IExcise
+Division
+61 j_1iexdi TYPEj_1iexdi, "46J1IExcise
+District
+62 j_1iexco TYPEj_1iexco, "47J1IExcise
+Commissionerate
+63 j_1ivtyp TYPEj_1ivtyp, "48J1IVendorT
+ype
+64 kunnr TYPEkna1-kunnr, "49CustomerNum
+ber(movedfromold#9)
+65 j_1ipanno TYPEj_1ipanno, "50PAN
+66 j_1isern TYPEj_1isern, "51ServiceTax
+Registration
+67 taxtype TYPEdfkkbptaxnum-taxtype,"52BPTaxNu
+mberCategory
+68 stcd3 TYPEstcd3, "53GSTNo.
+69 ven_class TYPEchar10, "54VendorClass
+70 isec TYPEbus_bupa_industry_sectors-isec,"55
+IndustrySector
+71 time_zone TYPEchar10, "56TimeZone
+72
+73 "CompanyCode57..65
+74 bukrs TYPElfb1-bukrs, "57CompanyCode
+75 akont TYPEakont, "58ReconAccoun
+t
+76 zuawa TYPEdzuawa, "59SortKey
+77 altkn TYPElfb1-altkn, "60PreviousAcc
+ountNumber
+78 mindk TYPEmindk, "61MinorityInd
+icator
+79 cerdt TYPEstring, "62Certificatio
+nDate(string;convertedlater) "char10 >string
+80 zterm TYPEdzterm, "63PaymentTerm
+s
+81 reprf TYPEreprf, "64DoubleInvoi
+ceCheck
+82 kverm TYPEkverm, "65AccountMemo
+/CheckFlag
+83
+84 "Payment(HouseBankID)66
+85 hbkid TYPEhbkid, "66NEW:HouseB
+ankID
+86
+87 "Purchasing67..87
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 6
+88 ekorg TYPEekorg, "67PurchasingO
+rganization
+89 waers TYPEwaers, "68Currency
+90 zterm_org TYPEdzterm, "69PaymentTerm
+s(Purchasing)
+91 verkf TYPEverkf, "70Responsible
+Salesperson
+92 inco1 TYPEinco1, "71IncotermsPa
+rt1
+93 inco1_l TYPEinco2_l, "72IncotermsLo
+cation1
+94 inco2 TYPEinco2, "73IncotermsPa
+rt2
+95 inco2_l TYPEinco3_l, "74IncotermsLo
+cation2
+96 webre TYPEwebre, "75GR-basedIV
+97 lebre TYPElebre, "76Service-base
+dIV
+98 kzaut TYPEkzaut, "77AutomaticPO
+Allowed
+99 lfabc TYPElfabc, "78ABCIndicato
+r
+100 stenr TYPEstenr, "79TANNumber
+101 profs TYPEprofs, "80MSMENumber
+102 j_1kftind TYPEindtyp, "81TypeofIndu
+stry
+103 j_1kftbus TYPEgestyp, "82TypeofBusi
+ness
+104 bahns TYPEbahns, "83TrainStatio
+n(CIN)
+105 telf1 TYPEtelf1, "84SupplierTel
+ephoneNo.
+106 ekgrp TYPEekgrp, "85PurchasingG
+roup
+107 kalsk TYPEkalsk, "86SchemaGroup
+108 parvw TYPEparvw, "87NEW:Partner
+Function(Purchasingoverride)
+109
+110 "Payment/Bank88..100
+111 banks TYPEbanks, "88BankCountry
+/RegionKey
+112 bank_id TYPEbu_bkvid, "89BPBankID
+113 bankl TYPEbankl, "90BankKey
+114 bankn TYPEbankn, "91BankAccount
+Number
+115 bkref TYPEbkref, "92RemainingBa
+nkAccountNo.
+116 koinh TYPEkoinh_fi, "93AccountHold
+erName
+117 ebpp_accname TYPEebpp_accname, "94User-defined
+BankAccountName
+118 banka TYPEbanka, "95NameofFina
+ncialInstitution
+119 region_1 TYPEregio, "96BankRegion
+(secondREGIO)
+120 street_1 TYPEbnka-stras, "97BankStreet
+121 city_1 TYPEort01, "98BankCity
+122 brnch TYPEbrnch, "99Branch
+123 swift TYPEbnka-swift, "100SwiftCode
+124
+125 "Other/Log/Keys101..103
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 7
+126 reason TYPEchar100, "101Reason
+127 lifnr TYPElifnr, "102VendorNumb
+er
+128 flag TYPEc, "103Flag
+129
+130 "Withholding104..114
+131 srno TYPEchar4, "104WHTSRNO(g
+roupkey)
+132 witht TYPEwitht, "105Withholding
+TaxType
+133 wt_subjct TYPEwt_subjct, "106Subjectto
+WHT?
+134 qsrec TYPEwt_qsrec, "107TypeofRec
+ipient
+135 wt_wtstcd TYPEwt_wtstcd, "108WHTIdentif
+icationNumber
+136 wt_withcd TYPEwt_withcd, "109WHTCode
+137 wt_exnr TYPEwt_exnr, "110ExemptionC
+ertificateNumber
+138 wt_exrt TYPEwt_exrt, "111ExemptionR
+ate
+139 wt_exdf TYPEstring, "112ExemptionF
+romDate
+140 wt_exdt TYPEstring, "113ExemptionT
+oDate
+141 wt_wtexrs TYPEwt_wtexrs, "114Reasonfor
+Exemption
+142 paymethod TYPElfb1-zwels, "115PaymentMet
+hod
+143 controlkey TYPElfbk-bkont, "116ControlKey
+144 ENDOFty_file_bp.
+145 TYPES:BEGINOFty_log.
+146 INCLUDETYPEty_file_bp.
+147 TYPES: msgty TYPEbapi_mtype,
+148 messageTYPEstring,
+149 ENDOFty_log.
+150 " endofchangesfornewtemplatebyHemangJoshi
+151
+152
+153 TYPES:BEGINOFty_file_extend,
+154 bpartnerTYPE bu_partner,
+155 ***COMPANYCODEDATA
+156 bukrs TYPElfb1-bukrs,
+157 akont TYPEakont,"RECONACCOUNT
+158 zuawa TYPEdzuawa,"SORTKEY
+159 mindk TYPEmindk,
+160 cerdt TYPEchar10,"CERDT,
+161 zterm TYPEdzterm,
+162 reprf TYPEreprf,
+163 ***PRCHASEORAGANISATION****
+164 ekorg TYPEekorg,
+165 waers TYPEwaers,
+166 verkf TYPEverkf,
+167 telf1 TYPEtelf1,
+168 ekgrp TYPEekgrp,
+169 kalsk TYPEkalsk,
+170 ENDOFty_file_extend.
+171
+172 TYPES:BEGINOFty_file_vendor,
+173 lifnrTYPElifnr,
+174 ENDOFty_file_vendor.
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 8
+175
+176 TYPES:BEGINOFty_lfa1,
+177 lifnrTYPElfa1-lifnr,
+178 ktokkTYPElfa1-ktokk,
+179 ENDOFty_lfa1.
+180
+181 TYPES:BEGINOFty_upload,
+182 client TYPEmandt,"CLNT 30CLIENT
+183 partner TYPEbu_partner,"CHAR 10 0BUSINESSPARTNERNUMBER
+184 taxtype TYPEbptaxtype, "CHAR40TAXNUMBERCATEGORY
+185 taxnum TYPEbptaxnum,"CHAR 20 0BUSINESSPARTNERTAXNUMB
+ER
+186 taxnumxlTYPEbptaxnumxl," CHAR 60 0BUSINESSPARTNERTAXN
+UMBER
+187 ENDOFty_upload.
+188
+189 TYPES:BEGINOFty_msg,
+190 partnerTYPEbu_partner,
+191 name TYPElfa1-name1,
+192 reason TYPEstring,
+193 ENDOFty_msg.
+194
+195 TYPES:BEGINOFty_log_ex.
+196 INCLUDETYPEty_file_extend.
+197 TYPES: msgty TYPEbapi_mtype,
+198 messageTYPEstring,
+199 ENDOFty_log_ex.
+200 *& *
+201 *& INTERNALTABLE&WORKAREADECLARATION
+202 *& *
+203 DATA:gt_raw TYPEsolix_tab,
+204 gv_bin_lenTYPEi.
+205 DATA:it_file TYPETABLEOFty_file_bp,
+206 it_file_all TYPETABLEOFty_file_bp,
+207 wa_file TYPEty_file_bp,
+208 t_error TYPETABLEOFty_file_bp,
+209 t_log TYPETABLEOFty_log,"TY_LOG,
+210 w_log TYPEty_log,"TY_LOG.
+211 t_log_ex TYPETABLEOFty_log_ex,
+212 w_log_ex TYPEty_log_ex,
+213 t_msg TYPESTANDARDTABLEOFty_msg,
+214 w_msg TYPEty_msg,
+215 t_filev TYPETABLEOFty_file_vendor,
+216 w_filev TYPEty_file_vendor,
+217 wa TYPEty_file_vendor,
+218 t_lfa1 TYPESTANDARDTABLEOFty_lfa1,
+219 w_lfa1 TYPEty_lfa1,
+220 it_raw TYPEtruxs_t_text_data,
+221 wa_bnka TYPEbnka,
+222 wa_final_2 TYPEty_upload,
+223 wa_final_3 TYPElfb1,
+224 wa_final_5 TYPElfm1,
+225 "AddedbykedarSubratOn25.09.2019forextendCCdata&Pur.Or
+g.Data
+226 it_file_extendTYPESTANDARDTABLEOFty_file_extend,
+227 wa_file_extendTYPEty_file_extend.
+228 "EndedbykedarSubratOn25.09.2019forextendCCdata&Pur.Org.Dat
+a
+229 *& *
+230 *& LOCALANDGLOBALVAIABLEDECLARATION
+231 *& *
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 9
+232 DATA:lv_flag,
+233 lv_vendorTYPElfa1-lifnr,
+234 lv_lengthTYPEi. "Yashveer19.10.2019
+235 * LE_DATA TYPEREFTOLCL_DATA_1.
+236 *& *
+237 *& LOCALANDGLOBALVAIABLEFORIDNUMBERDECLARATION
+238 *& *
+239 DATA:lv_id_from_date TYPEstring,"BU_ID_VALID_DATE_FROM,
+240 lv_id_to_date TYPEstring,"BU_ID_VALID_DATE_TO,
+241 lv1_id_from_date TYPEstring,
+242 lv2_id_from_date TYPEstring,
+243 lv1_id_to_date TYPEstring,
+244 lv2_id_to_date TYPEstring,
+245 lv1_identificationcategoryTYPEbapibus1006_identification_key-id
+entificationcategory,
+246 lv2_identificationcategoryTYPEstring,
+247 lv1_identificationnumber TYPEbapibus1006_identification_key-id
+entificationnumber,
+248 lv2_identificationnumber TYPEstring.
+249 *& *
+250 *& BPRELATEDDATADECLARATION
+251 *& *
+252 DATA:iv_partner TYPEbu_partner,
+253 wa_but000 TYPEbut000,
+254 wa_lfa1 TYPElfa1,
+255 partner_change TYPEflag,
+256 businesspartnerextern TYPEbapibus1006_head-bpartner,
+257 partnercategory TYPEbapibus1006_head-partn_cat,
+258 partnergroup TYPEbapibus1006_head-partn_grp,
+259 centraldata TYPEbapibus1006_central,
+260 centraldatax TYPEbapibus1006_central_x,
+261 central_group TYPEbapibus1006_central_group,
+262 central_groupx TYPEbapibus1006_central_group_x,
+263 centraldataperson TYPEbapibus1006_central_person,
+264 centraldatapersonx TYPEbapibus1006_central_person_x,
+265 centraldataorganization TYPEbapibus1006_central_organ,
+266 centraldataorganizationx TYPEbapibus1006_central_organ_x,
+267 centraldatagroup TYPEbapibus1006_central_group,
+268 addressdata TYPEbapibus1006_address,
+269 industries TYPEbapibus1006_industrysector,
+270 businesspartner TYPEbapibus1006_head-bpartner,
+271 it_telephondata TYPESTANDARDTABLEOFbapiadtel,
+272 wa_telephondata TYPEbapiadtel,
+273 it_maildata TYPESTANDARDTABLEOFbapiadsmtp,
+274 wa_maildata TYPEbapiadsmtp,
+275 industrysector LIKEbapibus1006_industrysector-indust
+rysector,
+276 identification LIKEbapibus1006_identification,
+277 defaultindustry LIKEbapibus1006_industrysector-defaul
+tindustrysector,
+278 defaultindustry_x LIKEbapibus1006_industrysector_x,
+279 industrysectorkeysystem LIKEbapibus1006_industrysector-indust
+rysectorkeysystem,
+280 industrysectordetail TYPESTANDARDTABLEOFbapibus1006_ind
+ustrysector,
+281 l_partner TYPEbapibus1006_head-bpartner,
+282 it_faxdata TYPESTANDARDTABLEOFbapiadfax,
+283 wa_faxdata TYPEbapiadfax,
+284 return TYPESTANDARDTABLEOFbapiret2,
+285 x_save_add TYPEbapi4001_1,
+286 chk_address TYPEbapibus1006_address,
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 10
+287 businesspartnerrolecategoryTYPEbapibus1006_bproles-partnerroleca
+tegory,
+288 all_businesspartnerroles TYPEbapibus1006_x-mark,
+289 businesspartnerrole TYPEbapibus1006_bproles-partnerrole,
+290 differentiationtypevalue TYPEbapibus1006_bproles-difftypevalue
+,
+291 validfromdate TYPEbapibus1006_bprole_validity-bprol
+evalidfrom,
+292 validuntildate TYPEbapibus1006_bprole_validity-bprol
+evalidto.
+293 *& *
+294 *& CompanyCodeExtendRelated DATADECLARATION
+295 *& *
+296 DATA:lt_vendors TYPEvmds_ei_extern_t,
+297 ls_vendors TYPEvmds_ei_extern,
+298 ls_central TYPEvmds_ei_vmd_central,
+299 lt_company TYPEvmds_ei_company_t,
+300 ls_company TYPEvmds_ei_company,
+301 ls_company_data TYPEvmds_ei_vmd_company,
+302 is_master_data TYPEvmds_ei_main,
+303 ls_address TYPEcvis_ei_address1,
+304 es_master_data_correct TYPEvmds_ei_main,
+305 es_message_correct TYPEcvis_message,
+306 es_master_data_defectiveTYPEvmds_ei_main,
+307 es_message_defective TYPEcvis_message.
+308 *& *
+309 *& PurchasingDataExtendRelated DATADECLARATION
+310 *& *
+311 DATA:lt_purchasing TYPEvmds_ei_purchasing_t,
+312 ls_purchasing TYPEvmds_ei_purchasing,
+313 lt_purch_func TYPEvmds_ei_functions_t,
+314 ls_purch_func TYPEvmds_ei_functions,
+315 ls_purch_fun_dataTYPEvmds_ei_vmd_functions,
+316 ls_purchas_data TYPEvmds_ei_vmd_purchasing,
+317 iv_ktokd TYPEktokd,
+318 et_parvw TYPEcmds_parvw_t.
+319 DATA:gs_vmds_extern TYPEvmds_ei_main,
+320 gs_succ_messagesTYPEcvis_message,
+321 gs_vmds_error TYPEvmds_ei_main,
+322 gs_err_messages TYPEcvis_message,
+323 gs_vmds_succ TYPEvmds_ei_main,
+324 gv_ktokk TYPEktokk,
+325 gv_ccode TYPEbukrs,
+326 gv_akont TYPEakont,
+327 gv_name TYPEname1.
+328 *& *
+329 *& ALVRELATEDDATADECLARATION
+330 *& *
+331 DATA:t_fcat TYPEslis_t_fieldcat_alv,
+332 w_fcat TYPEslis_fieldcat_alv,
+333 s_layoutTYPEslis_layout_alv.
+21.07.26
+DEV
+Include ZMM_VEND_MASTER_SCR
+Page
+11
+1 *&
+2 *& Include
+3 *&
+ZMM_VEND_MASTER_SCR
+*
+*
+4 *&
+*
+5 *&
+6 *&
+SELECTION SCREEN
+*
+7 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-101.
+8
+SELECTION-SCREEN BEGIN OF LINE.
+9
+10
+11
+12
+13
+14
+15
+PARAMETERS : rb_new RADIOBUTTON GROUP r1 USER-COMMAND uc1 DEFAULT 'X
+'.
+SELECTION-SCREEN COMMENT 4(20) TEXT-001 FOR FIELD rb_new.
+PARAMETERS : rb_chg RADIOBUTTON GROUP r1.
+SELECTION-SCREEN COMMENT (40) TEXT-003 FOR FIELD rb_chg.
+PARAMETERS : rb_ext RADIOBUTTON GROUP r1.
+SELECTION-SCREEN COMMENT (60) TEXT-002 FOR FIELD rb_ext.
+SELECTION-SCREEN END OF LINE.
+16 SELECTION-SCREEN END OF BLOCK b1.
+17 SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-102.
+18
+PARAMETERS: p_flname TYPE localfile.
+19 SELECTION-SCREEN END OF BLOCK b2.
+20 SELECTION-SCREEN: BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-103.
+21
+" Defining the button on the selection screen
+22
+SELECTION-SCREEN PUSHBUTTON /2(25) btn_tpl USER-COMMAND dtl.
+23 SELECTION-SCREEN: END OF BLOCK b3.
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 12
+1 *& *
+2 *&Include ZMM_VEND_MASTER_CL
+3 *& *
+4 *& *
+5 *& CLASSDECLARATION
+6 *& *
+7 CLASSlcl_dataDEFINITION.
+8 PUBLICSECTION.
+9 METHODS:create_vendor_data.
+10
+11 PRIVATESECTION.
+12 METHODS:prepare_data
+13 RETURNINGVALUE(re_flag)TYPEi.
+14 * DATADECLARATIONS
+15 DATA:gs_vmds_extern TYPEvmds_ei_main,
+16 gs_succ_messagesTYPEcvis_message,
+17 gs_vmds_error TYPEvmds_ei_main,
+18 gs_err_messages TYPEcvis_message,
+19 gs_vmds_succ TYPEvmds_ei_main,
+20 gv_ktokk TYPEktokk,
+21 gv_ccode TYPEbukrs,
+22 gv_akont TYPEakont,
+23 gv_name TYPEname1.
+24 ENDCLASS. "LCL_DATA
+25 * *
+26 * CLASSLCL_DATAIMPLEMENTATION
+27 * *
+28 CLASSlcl_dataIMPLEMENTATION.
+29 *& *
+30 *& METHODTOCREATEVENDORDATA
+31 *& *
+32 METHODcreate_vendor_data.
+33 * LOCALDATADECLARATION
+34 DATA:lv_returnTYPEi.
+35 * PREPARETHEDATATOBEUSEDFORVENDORCREATION
+36 lv_return= me->prepare_data().
+37 * DONOTPROCEEDIFTHEVENDORDATAFORCREATIONWASNOTPREPARED
+38 IFlv_returnISNOTINITIAL.
+39 EXIT.
+40 ENDIF.
+41 * INITIALIZEALLTHEDATA
+42 vmd_ei_api=>initialize().
+43 * CALLTHEMETHODFORCREATIONOFVENDOR.
+44 CALLMETHODvmd_ei_api=>maintain_bapi
+45 EXPORTING
+46 is_master_data =gs_vmds_extern
+47 IMPORTING
+48 es_master_data_correct =gs_vmds_succ
+49 es_message_correct =gs_succ_messages
+50 es_master_data_defective=gs_vmds_error
+51 es_message_defective =gs_err_messages.
+52
+53 IFgs_err_messages-is_errorISINITIAL.
+54 COMMITWORKANDWAIT.
+55 ELSE.
+56 w_log-message= {w_log-message}VendorBAPIFailed:.
+57 LOOPATgs_err_messages-messagesINTODATA(wa_err).
+58 w_log-message= {w_log-message}{wa_err-message};.
+59 ENDLOOP.
+60 ENDIF.
+61 ENDMETHOD. "CREATE_VENDOR_DATA
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 13
+62 *& *
+63 *& METHODTOPREPAREDATAFORVENDORCREATION
+64 *& *
+65 METHODprepare_data.
+66 DATA:lt_contacts TYPEvmds_ei_contacts_t,
+67 ls_contacts TYPEvmds_ei_contacts,
+68 lt_vendors TYPEvmds_ei_extern_t,
+69 ls_vendors TYPEvmds_ei_extern,
+70 ls_address TYPEcvis_ei_address1,
+71 ls_addressdep TYPEvmds_ei_central_addr,
+72 lt_company TYPEvmds_ei_company_t,
+73 ls_company TYPEvmds_ei_company,
+74 whtax_t TYPEvmds_ei_wtax_type_t,
+75 whtax_s TYPEvmds_ei_wtax_type,
+76 ls_company_data TYPEvmds_ei_vmd_company,
+77 ls_purchas_data TYPEvmds_ei_vmd_purchasing,
+78 lt_purchasing TYPEvmds_ei_purchasing_t,
+79 lt_purchasing2 TYPEvmds_ei_purchasing2_t,
+80 ls_purchasing TYPEvmds_ei_purchasing,
+81 ls_purchasing2 TYPEvmds_ei_purchasing2_s,
+82 lt_purch_func TYPEvmds_ei_functions_t,
+83 ls_purch_func TYPEvmds_ei_functions,
+84 ls_purch_fun_dataTYPEvmds_ei_vmd_functions,
+85 ls_message TYPEcvis_message,
+86 lv_contactid TYPEbapicontact_01-contact,
+87 l_ktokk TYPEktokk,
+88 ls_lfa1 TYPEvmds_lfa1_s.
+89
+90 DATA:lv_date_frmc TYPEdats,
+91 lv_date_toc TYPEdats,
+92 lv_file_frm_dateTYPEstring,
+93 lv_file_to_date TYPEstring.
+94
+95 DATA:iv_ktokdTYPEktokd,
+96 et_parvwTYPEcmds_parvw_t.
+97
+98 DATA:lv_date_con TYPEdats,
+99 lv_file_dateTYPEstring.
+100
+101 wa_file-bpartner= {wa_file-bpartnerALPHA=IN}.
+102
+103 CLEAR:gs_vmds_extern.
+104
+105 ls_vendors-header-object_instance-lifnr= {lfa1-lifnrALPHA=IN}
+.
+106 ls_vendors-header-object_task='U'.
+107
+108 ls_addressdep-data-bahns=wa_file-bahns.
+109 ls_addressdep-datax-bahns=abap_true.
+110 APPENDls_addressdepTOls_vendors-central_data-central-central_addr
+essdep-addressdep.
+111
+112 ls_vendors-central_data-central=VALUE#(
+113 data=VALUE#(
+114 stenr =wa_file-stenr
+115 profs =wa_file-profs
+116 bahns =wa_file-bahns
+117 j_1kftind=wa_file-j_1kftind
+118 j_1kftbus=wa_file-j_1kftbus
+119 )
+120 datax=VALUE#(
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 14
+121 stenr ='X'
+122 profs ='X'
+123 bahns ='X'
+124 j_1kftind='X'
+125 j_1kftbus='X'
+126 )
+127 ).
+128
+129 ls_vendors-central_data-address=VALUE#(
+130 task='U'
+131 postal=VALUE#(
+132 data=VALUE#(
+133 name =lfa1-name1
+134 country=lfa1-land1
+135 )
+136 datax=VALUE#(
+137 name ='X'
+138 country='X'
+139 )
+140 )
+141 ).
+142 *& *
+143 *& * SETTHECOMPANYCODEANDGLACCOUNT
+144 *& *
+145 IFwa_file-bukrsISNOTINITIAL.
+146 CLEARw_lfa1.
+147
+148 READTABLEt_lfa1INTOw_lfa1WITHKEYlifnr=lfa1-lifnr.
+149 IFsy-subrc=0.
+150 l_ktokk=w_lfa1-ktokk.
+151 ENDIF.
+152
+153 ls_company=VALUE#(
+154 task ='M'
+155 data_key =VALUE#(bukrs=wa_file-bukrs)
+156 data =VALUE#(
+157 akont = {wa_file-akontALPHA=IN} "InlineAlphaConve
+rsion
+158 zuawa =wa_file-zuawa
+159 altkn =wa_file-altkn
+160 "Dateconversionusingfunctionalstyle/stringtemplates
+161 cerdt =COND#(WHENwa_file-cerdtISNOTINITIALTHEN {w
+a_file-cerdt+6(4)}{wa_file-cerdt+3(2)}{wa_file-cerdt+0(2)} ELSE''
+)
+162 reprf =wa_file-reprf
+163 zterm =wa_file-zterm
+164 kverm =wa_file-kverm
+165 hbkid =wa_file-hbkid
+166 mindk =wa_file-mindk
+167 zwels =wa_file-paymethod
+168 )
+169 datax =VALUE#(
+170 zterm ='X'akont='X'zuawa='X'altkn='X'
+171 reprf ='X'kverm='X'hbkid='X'mindk='X'
+172 zwels ='X'
+173 )
+174 ).
+175 IFwa_file-srnoISNOTINITIAL.
+176 LOOPATit_file_allINTODATA(wa_file_all)WHEREsrno=wa_file
+srno.
+177 whtax_s-task ='M'.
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 15
+178 whtax_s-data_key-witht =wa_file_all-witht.
+179 whtax_s-data-wt_withcd =wa_file_all-wt_withcd.
+180 whtax_s-data-wt_subjct =wa_file_all-wt_subjct.
+181 whtax_s-data-wt_wtstcd =wa_file_all-wt_wtstcd.
+182 whtax_s-data-wt_exnr =wa_file_all-wt_exnr .
+183 whtax_s-data-wt_exrt =wa_file_all-wt_exrt.
+184
+185 IFwa_file_all-wt_exdfISNOTINITIAL.
+186 lv_file_frm_date=wa_file_all-wt_exdf.
+187 lv_date_frmc=lv_file_frm_date+6(4)&&lv_file_frm_date+3(2
+)&&lv_file_frm_date+0(2).
+188 ENDIF.
+189 IFwa_file_all-wt_exdtISNOTINITIAL.
+190 lv_file_to_date=wa_file_all-wt_exdt.
+191 lv_date_toc=lv_file_to_date+6(4)&&lv_file_to_date+3(2)&
+&lv_file_to_date+0(2).
+192 ENDIF.
+193
+194 whtax_s-data-wt_exdf =lv_date_frmc.
+195 whtax_s-data-wt_exdt =lv_date_toc.
+196 whtax_s-data-wt_wtexrs =wa_file_all-wt_wtexrs.
+197 whtax_s-data-qsrec =wa_file_all-qsrec.
+198
+199 whtax_s-datax-wt_withcd =abap_true.
+200 whtax_s-datax-wt_subjct =abap_true.
+201 whtax_s-datax-wt_wtstcd =abap_true.
+202 whtax_s-datax-wt_exnr =abap_true.
+203 whtax_s-datax-wt_exrt =abap_true.
+204 whtax_s-datax-wt_exdf =abap_true.
+205 whtax_s-datax-wt_exdt =abap_true.
+206 whtax_s-datax-wt_wtexrs =abap_true.
+207 whtax_s-datax-qsrec =abap_true.
+208
+209 APPENDwhtax_sTOwhtax_t.
+210 CLEAR:whtax_s,wa_file_all.
+211 ENDLOOP.
+212
+213 ls_company-wtax_type-wtax_type=whtax_t.
+214 ENDIF.
+215
+216 APPENDls_companyTOls_vendors-company_data-company.
+217 ENDIF.
+218 *& *
+219 *& * SETTHEPURCHASINGDATA
+220 *& *
+221 IFwa_file-ekorgISNOTINITIAL.
+222 vmd_ei_api_check=>get_mand_partner_functions(
+223 EXPORTINGiv_ktokk=w_lfa1-ktokk
+224 IMPORTINGet_parvw=et_parvw
+225 ).
+226
+227 DATA:lt_existing_wyt3TYPETABLEOFwyt3.
+228 SELECT*FROMwyt3
+229 INTOTABLElt_existing_wyt3
+230 WHERElifnr=w_lfa1-lifnr
+231 ANDekorg=wa_file-ekorg.
+232
+233 ls_purchasing=VALUE#(
+234 task ='M'
+235 data_key=VALUE#(ekorg=wa_file-ekorg)
+236 data =VALUE#(
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 16
+237 waers =wa_file-waers
+238 zterm =wa_file-zterm_org
+239 verkf =wa_file-verkf
+240 telf1 =wa_file-telf1
+241 ekgrp =wa_file-ekgrp
+242 kalsk =wa_file-kalsk
+243 lebre =wa_file-lebre
+244 kzaut =wa_file-kzaut
+245 inco1 =wa_file-inco1
+246 inco2_l=wa_file-inco1_l
+247 inco2 =wa_file-inco2
+248 inco3_l=wa_file-inco2_l
+249 webre =wa_file-webre
+250 lfabc =wa_file-lfabc
+251 )
+252 datax =VALUE#(
+253 waers='X'zterm='X'verkf='X'telf1='X'ekgrp='X'
+254 kalsk='X'lebre='X'kzaut='X'inco1='X'inco2_l='X'
+255 inco2='X'inco3_l='X'webre='X'
+256 )
+257 ).
+258
+259 ls_purchasing-functions-functions=VALUE#(FORwaINet_parvw(
+260 task =COND#(WHENline_exists(lt_existing_wyt3[parvw=
+wa-parvw])
+261 THEN'U'
+262 ELSE'I')
+263 data_key=VALUE#(parvw=wa-parvw)
+264 data =VALUE#(partner=w_lfa1-lifnr)
+265 datax =VALUE#(partner='X')
+266 )).
+267
+268 APPENDls_purchasingTOls_vendors-purchasing_data-purchasing.
+269 ENDIF.
+270
+271 APPENDls_vendorsTOgs_vmds_extern-vendors.
+272
+273 MOVEwa_file-bpartnerTOiv_partner.
+274 IFrb_new='X'ANDwa_file-banklISNOTINITIAL.
+275 PERFORMupload_bank_to_bp.
+276 ENDIF.
+277 ENDMETHOD. "PREPARE_DATA
+278 ENDCLASS. "LCL_DATAIMPLEMENTATION
+279
+280 DATA:lo_dataTYPEREFTOlcl_data.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 17
+1 *& *
+2 *&Include ZMM_VEND_MASTER_FORMS
+3 *& *
+4 FORMdownload_template.
+5 DATA:lv_filename TYPEstring,
+6 lt_file_dataTYPETABLEOFstring,
+7 lv_header TYPEstring,
+8 lv_fname TYPEstring,
+9 lv_path TYPEstring,
+10 lv_fpath TYPEstring,
+11 lv_action TYPEi.
+12
+13 "Addyourspecificfieldlisthere
+14 DATA(lv_tab)=cl_abap_char_utilities=>horizontal_tab.
+15
+16 IFrb_new='X'.
+17 lv_header= BusinessPartnerNumber{lv_tab}PartnerType{lv_tab}
+BPGrouping{lv_tab}Title{lv_tab} &&
+18 Name1{lv_tab}Name2{lv_tab}Name3{lv_tab}Name4{
+lv_tab} &&
+19 OldVendorCode{lv_tab}SearchTerm1{lv_tab}Search
+Term2{lv_tab}BUILDING{lv_tab} &&
+20 ROOMNUMBER{lv_tab}FLOOR{lv_tab}STREET{lv_tab}STRE
+ET1{lv_tab} &&
+21 STREET2{lv_tab}STREET3{lv_tab}LOCATION{lv_tab}DIS
+TRICT{lv_tab} &&
+22 HOMECITY{lv_tab}PostalCode{lv_tab}City{lv_tab}C
+ountry{lv_tab} &&
+23 Region(General){lv_tab}Telephonenumber{lv_tab}Mob
+ilenumber{lv_tab}FaxNumber{lv_tab} &&
+24 Email0{lv_tab}ValidFrom{lv_tab}ValidTo{lv_tab}
+PartnerType{lv_tab} &&
+25 IdentificationCategory{lv_tab}IdentificationNumber{
+lv_tab}IDFromDate{lv_tab}IDToDate{lv_tab} &&
+26 Telephoneno.3{lv_tab}Email1{lv_tab}Email2{lv_t
+ab}Email3{lv_tab} &&
+27 Email4{lv_tab}Email5{lv_tab}Email6{lv_tab}J1I
+Excise-Dep{lv_tab}J1IExcise-Range{lv_tab}J1IExcise-Division{
+lv_tab} &&
+28 J1IExcise-District{lv_tab}J1IExcise-Commissione
+rate{lv_tab}J1IVendorType{lv_tab}CustomerNumber{lv_tab} &&
+29 PAN{lv_tab}ServiceTaxRegistration{lv_tab}BPTaxN
+umberCategory{lv_tab}GSTNo.{lv_tab} &&
+30 VendorClass{lv_tab}IndustrySector{lv_tab}TimeZon
+e{lv_tab}CompanyCode{lv_tab} &&
+31 ReconAccount{lv_tab}SortKey{lv_tab}PreviousAccou
+ntNumber{lv_tab}MinorityIndicator{lv_tab} &&
+32 CertificationDate{lv_tab}PaymentTerms{lv_tab}Doub
+leInvoiceCheck{lv_tab}AccountMemo/CheckFlag{lv_tab} &&
+33 NEW:HouseBankID{lv_tab}PurchasingOrganization{lv
+_tab}Currency{lv_tab}PaymentTerms(Purchasing){lv_tab} &&
+34 ResponsibleSalesperson{lv_tab}IncotermsPart1{lv_t
+ab}IncotermsLocation1{lv_tab}IncotermsPart2{lv_tab} &&
+35 IncotermsLocation2{lv_tab}GR-basedIV{lv_tab}Serv
+ice-basedIV{lv_tab}AutomaticPOAllowed{lv_tab} &&
+36 ABCIndicator{lv_tab}TANNumber{lv_tab}MSMENumber{
+lv_tab}TypeofIndustry{lv_tab} &&
+37 TypeofBusiness{lv_tab}TrainStation(CIN){lv_tab}
+SupplierTelephoneNo.{lv_tab}PurchasingGroup{lv_tab} &&
+38 SchemaGroup{lv_tab}PartnerFunction(Purchasingover
+ride){lv_tab}BankCountry/RegionKey{lv_tab}BPBankID{lv_tab} &&
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 18
+39 BankKey{lv_tab}BankAccountNumber{lv_tab}Remainin
+gBankAccountNo.{lv_tab}AccountHolderName{lv_tab} &&
+40 User-definedBankAccountName{lv_tab}NameofFinanci
+alInstitution{lv_tab}BankRegion{lv_tab}BankStreet{lv_tab} &&
+41 BankCity{lv_tab}Branch{lv_tab}SwiftCode{lv_tab}
+Reason{lv_tab} &&
+42 VendorNumber{lv_tab}Flag{lv_tab}WHTSRNO(groupke
+y){lv_tab}WithholdingTaxType{lv_tab} &&
+43 SubjecttoWHT{lv_tab}TypeofRecipient{lv_tab}WHT
+IdentificationNumber{lv_tab}WHTCode{lv_tab} &&
+44 ExemptionCertificateNumber{lv_tab}ExemptionRate{l
+v_tab}ExemptionFromDate{lv_tab}ExemptionToDate{lv_tab} &&
+45 ReasonforExemption{lv_tab}PaymentMethod{lv_tab}C
+ontrolKey.
+46 ELSEIFrb_ext='X'ORrb_chg='X'.
+47 lv_header= BusinessPartnerNumber{lv_tab}CompanyCode{lv_tab}
+ReconAccount{lv_tab} &&
+48 SortKey{lv_tab}MinorityIndicator{lv_tab}Certifica
+tionDate{lv_tab} &&
+49 PaymentTerms{lv_tab}DoubleInvoiceCheck{lv_tab}Pu
+rchasingOrg{lv_tab} &&
+50 Currency{lv_tab}ResponsibleSalesperson{lv_tab}Vend
+orTel{lv_tab} &&
+51 PurchasingGroup{lv_tab}SchemaGroup .
+52 ENDIF.
+53 APPENDlv_headerTOlt_file_data.
+54
+55
+56 "OpenSaveDialog
+57 lv_filename= BP_Vend_Template_{sy-datum}_{sy-uzeit}.
+58
+59 CALLMETHODcl_gui_frontend_services=>file_save_dialog
+60 EXPORTING
+61 window_title ='SaveTemplateAs'
+62 default_extension='XLS'
+63 default_file_name=lv_filename
+64 initial_directory='C:\'
+65 CHANGING
+66 filename =lv_filename
+67 path =lv_path
+68 fullpath =lv_fpath
+69 user_action =lv_action.
+70
+71 CHECKlv_action=cl_gui_frontend_services=>action_ok.
+72
+73 "DownloadHeaderonly(emptydatatable)
+74 CALLFUNCTION'GUI_DOWNLOAD'
+75 EXPORTING
+76 filename =lv_fpath
+77 filetype ='DAT'
+78 write_field_separator='X'"EnsuresExcelcolumnsalign
+79 TABLES
+80 data_tab =lt_file_data.
+81 ENDFORM.
+82 *& *
+83 *&FormVALUE_REQUEST
+84 *& *
+85 *&text
+86 *& *
+87 *& > p1 text
+88 *&< p2 text
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 19
+89 *& *
+90 FORMvalue_request.
+91 CALLFUNCTION'F4_FILENAME'
+92 EXPORTING
+93 program_name=sy-cprog
+94 IMPORTING
+95 file_name =p_flname.
+96 ENDFORM.
+97 *& *
+98 *&FormUPLOAD_EXCEL
+99 *& *
+100 *&text
+101 *& *
+102 *& > p1 text
+103 *&< p2 text
+104 *& *
+105 FORMupload_excel.
+106 DATA:lv_fname TYPEstring.
+107
+108 lv_fname=p_flname.
+109
+110 CALLFUNCTION'GUI_UPLOAD'
+111 EXPORTING
+112 filename =lv_fname
+113 filetype ='BIN'
+114 IMPORTING
+115 filelength =gv_bin_len
+116 TABLES
+117 data_tab =gt_raw
+118 EXCEPTIONS
+119 file_open_error =1
+120 file_read_error =2
+121 no_batch =3
+122 gui_refuse_filetransfer=4
+123 invalid_type =5
+124 no_authority =6
+125 unknown_error =7
+126 bad_data_format =8
+127 header_not_allowed =9
+128 separator_not_allowed =10
+129 header_too_long =11
+130 unknown_dp_error =12
+131 access_denied =13
+132 dp_out_of_memory =14
+133 disk_full =15
+134 dp_timeout =16
+135 OTHERS =17.
+136 ENDFORM.
+137 *& *
+138 *&Formconvert_data_cr
+139 *& *
+140 *&text
+141 *& *
+142 *& > p1 text
+143 *&< p2 text
+144 *& *
+145 FORMconvert_data_cr.
+146 DATA:lv_xstring TYPExstring,
+147 lo_excel TYPEREFTOcl_fdt_xl_spreadsheet,
+148 lv_docname TYPEstring,
+149 lt_worksheetsTYPESTANDARDTABLEOFstring,
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 20
+150 lv_worksheet TYPEstring,
+151 lv_lines TYPEi,
+152 lo_data TYPEREFTOdata.
+153
+154 FIELD-SYMBOLS:<lt_data_bin> TYPESTANDARDTABLE,
+155 <ls_data_bin> TYPEany,
+156 <lv_value_bin>TYPEany,
+157 <lv_value> TYPEany.
+158
+159 CALLFUNCTION'SCMS_BINARY_TO_XSTRING'
+160 EXPORTING
+161 input_length=gv_bin_len
+162 IMPORTING
+163 buffer =lv_xstring
+164 TABLES
+165 binary_tab =gt_raw
+166 EXCEPTIONS
+167 failed =1
+168 OTHERS =2.
+169
+170 CREATEOBJECTlo_excel
+171 EXPORTING
+172 document_name=lv_docname
+173 xdocument =lv_xstring.
+174
+175 IFlo_excelISNOTINITIAL.
+176 lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+177 IMPORTING
+178 worksheet_names=lt_worksheets).
+179 ENDIF.
+180
+181 DESCRIBETABLElt_worksheetsLINESlv_lines.
+182
+183 IFlt_worksheets[]ISNOTINITIAL.
+184 READTABLElt_worksheetsINTOlv_worksheetINDEXlv_lines.
+185 lo_data=lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+lv_worksheet).
+186 ASSIGNlo_data->*TO<lt_data_bin>.
+187 ENDIF.
+188
+189 IF<lt_data_bin>ISASSIGNED.
+190 LOOPAT<lt_data_bin>ASSIGNING<ls_data_bin>FROM2.
+191 CLEAR:wa_file.
+192 DO.
+193 ASSIGNCOMPONENTsy-indexOFSTRUCTURE<ls_data_bin>TO<lv_valu
+e_bin>.
+194 IFsy-subrcEQ0.
+195 ASSIGNCOMPONENTsy-indexOFSTRUCTUREwa_fileTO<lv_value>.
+196 IFsy-subrcEQ0.
+197 <lv_value>=<lv_value_bin>.
+198 ENDIF.
+199 ELSE.
+200 EXIT.
+201 ENDIF.
+202 ENDDO.
+203 IFwa_fileISNOTINITIAL.
+204 APPENDwa_fileTOit_file.
+205 ENDIF.
+206 ENDLOOP.
+207 ENDIF.
+208 ENDFORM.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 21
+209 *& *
+210 *&Formconvert_data_ex
+211 *& *
+212 *&text
+213 *& *
+214 *& > p1 text
+215 *&< p2 text
+216 *& *
+217 FORMconvert_data_ex.
+218 DATA:lv_xstring TYPExstring,
+219 lo_excel TYPEREFTOcl_fdt_xl_spreadsheet,
+220 lv_docname TYPEstring,
+221 lt_worksheetsTYPESTANDARDTABLEOFstring,
+222 lv_worksheet TYPEstring,
+223 lv_lines TYPEi,
+224 lo_data TYPEREFTOdata.
+225
+226 FIELD-SYMBOLS:<lt_data_bin> TYPESTANDARDTABLE,
+227 <ls_data_bin> TYPEany,
+228 <lv_value_bin>TYPEany,
+229 <lv_value> TYPEany.
+230
+231 CALLFUNCTION'SCMS_BINARY_TO_XSTRING'
+232 EXPORTING
+233 input_length=gv_bin_len
+234 IMPORTING
+235 buffer =lv_xstring
+236 TABLES
+237 binary_tab =gt_raw
+238 EXCEPTIONS
+239 failed =1
+240 OTHERS =2.
+241
+242 CREATEOBJECTlo_excel
+243 EXPORTING
+244 document_name=lv_docname
+245 xdocument =lv_xstring.
+246
+247 IFlo_excelISNOTINITIAL.
+248 lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+249 IMPORTING
+250 worksheet_names=lt_worksheets).
+251 ENDIF.
+252
+253 DESCRIBETABLElt_worksheetsLINESlv_lines.
+254
+255 IFlt_worksheets[]ISNOTINITIAL.
+256 READTABLElt_worksheetsINTOlv_worksheetINDEXlv_lines.
+257 lo_data=lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+lv_worksheet).
+258 ASSIGNlo_data->*TO<lt_data_bin>.
+259 ENDIF.
+260
+261 IF<lt_data_bin>ISASSIGNED.
+262 LOOPAT<lt_data_bin>ASSIGNING<ls_data_bin>FROM2.
+263 CLEAR:wa_file_extend.
+264 DO.
+265 ASSIGNCOMPONENTsy-indexOFSTRUCTURE<ls_data_bin>TO<lv_valu
+e_bin>.
+266 IFsy-subrcEQ0.
+267 ASSIGNCOMPONENTsy-indexOFSTRUCTUREwa_file_extendTO<lv_v
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 22
+alue>.
+268 IFsy-subrcEQ0.
+269 <lv_value>=<lv_value_bin>.
+270 ENDIF.
+271 ELSE.
+272 EXIT.
+273 ENDIF.
+274 ENDDO.
+275 IFwa_file_extendISNOTINITIAL.
+276 APPENDwa_file_extendTOit_file_extend.
+277 ENDIF.
+278 ENDLOOP.
+279 ENDIF.
+280 ENDFORM.
+281 *& *
+282 *&FormCREATE_BP_VENDOR
+283 *& *
+284 *&text
+285 *& *
+286 *& > p1 text
+287 *&< p2 text
+288 *& *
+289 FORMcreate_bp_vendor.
+290 it_file_all[]=it_file[].
+291 DELETEit_fileWHEREbukrsISINITIAL.
+292 LOOPATit_fileINTOwa_file.
+293 CLEAR:businesspartnerextern,
+294 partnercategory,
+295 partnergroup,
+296 centraldata,
+297 centraldataperson,
+298 centraldataorganization,
+299 addressdata.
+300 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+301 EXPORTING
+302 input =wa_file-bpartner
+303 IMPORTING
+304 output=wa_file-bpartner.
+305
+306 partnercategory=wa_file-partn_cat.
+307 partnergroup=wa_file-partn_grp.
+308
+309 CLEARbusinesspartnerextern.
+310
+311 "CreateGeneralBP
+312 PERFORMfill_central_data_vendor.
+313 PERFORMfill_address_vendor.
+314
+315
+316 * BeginofchangesbyHemangforBPnotgettingcreatedReqBy:OmPra
+kash
+317 "CheckifBPexists
+318 IFwa_file-bpartnerISNOTINITIAL.
+319 SELECTSINGLEpartnerFROMbut000INTO@DATA(lv_partner)WHEREpar
+tner=@wa_file-bpartner.
+320 IFsy-subrc<>0.
+321 businesspartnerextern=wa_file-bpartner.
+322 ELSE.
+323 partner_change=abap_true.
+324 ENDIF.
+325 ENDIF.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 23
+326 IFlv_partnerISINITIALAND(wa_file-bpartnerISINITIALORwa_fil
+e-bpartnerISNOTINITIAL).
+327 PERFORMcall_bapi_bupa_create.
+328 ELSE.
+329 PERFORMcall_bapi_bupa_central_change.
+330 ENDIF.
+331
+332 * EndofchangesbyHemangforBPnotgettingcreatedReqBy:OmPraka
+sh
+333
+334 IFbusinesspartnerISNOTINITIAL.
+335 "AddVendorRoles(FLVN00forFI,FLVN01forPurchasing)
+336 PERFORMadd_vendor_roles.
+337
+338 SELECTSINGLElink~vendor
+339 FROMbut000ASbp
+340 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+341 WHEREbp~partner=@wa_file-bpartner
+342 INTO@DATA(lv_vend_id).
+343 IFsy-subrc=0.
+344 lv_vendor=lv_vend_id.
+345 w_log-message= {w_log-message}LinkedVendor:{lv_vend_id}
+..
+346 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+347 IFsy-subrc=0.
+348 wa_file-lifnr=lfa1-lifnr.
+349 ENDIF.
+350 SELECTSINGLE*FROMbut020WHEREpartner=wa_file-bpartner.
+351 REFRESH:t_lfa1[].
+352 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=lv_
+vendor.
+353
+354 CREATEOBJECTlo_data.
+355 CALLMETHODlo_data->create_vendor_data.
+356 ENDIF.
+357 SELECTSINGLElink~vendor
+358 FROMbut000ASbp
+359 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+360 WHEREbp~partner=@wa_file-bpartner
+361 INTO@lv_vend_id.
+362 IFlv_vend_idISNOTINITIAL.
+363 IFpartner_changeISINITIAL.
+364 UPDATElfa1SETven_class=wa_file-ven_class
+365 j_1ipanno=wa_file-j_1ipanno
+366 j_1iexcd =wa_file-j_1iexcd
+367 j_1iexrn =wa_file-j_1iexrn
+368 j_1iexrg =wa_file-j_1iexrg
+369 j_1iexdi =wa_file-j_1iexdi
+370 j_1iexco =wa_file-j_1iexco
+371 j_1ivtyp =wa_file-j_1ivtyp
+372 j_1isern =wa_file-j_1isern
+373 j_1kftbus=wa_file-j_1kftbus "JNewlyAdded
+374 j_1kftind=wa_file-j_1kftind "JNewlyAdded
+375 bahns =wa_file-bahns "JNewlyAdded
+376 stenr =wa_file-stenr "JNewlyAdded
+377 profs =wa_file-profs
+378 WHERElifnr=lv_vendor.
+379 COMMITWORKANDWAIT.
+380 w_log-message= {w_log-message}LFA1datamodified. .
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 24
+381 ENDIF.
+382 ENDIF.
+383 ELSE.
+384 w_log-message= {w_log-message}VendorCreationFailed. .
+385 ENDIF.
+386 APPENDw_logTOt_log.
+387 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+388 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+389 CLEAR:lv_vend_id,businesspartner,wa_file,partner_change.
+390 ENDLOOP.
+391 ENDFORM.
+392 FORMfill_central_data_vendor.
+393 centraldata=VALUE#(
+394 searchterm1 =wa_file-searchterm1
+395 searchterm2 =wa_file-searchterm2
+396 title_key =wa_file-title
+397 partnertype =wa_file-partnertype
+398 partnerlanguage ='E'
+399 partnerlanguageiso='EN'
+400 ).
+401
+402 centraldatax=CORRESPONDING#(centraldata).
+403
+404 centraldataperson=COND#(WHENpartnercategory=1
+405 THENVALUE#(firstname=wa_file-name_fir
+st
+406 lastname =wa_file-name_las
+t
+407 birthname=wa_file-name_las
+t2
+408 middlename=wa_file-name_mi
+ddle
+409 correspondlanguage='E'
+410 correspondlanguageiso='EN'
+)).
+411
+412 centraldataorganization=COND#(WHENpartnercategory=2
+413 THENVALUE#(name1=wa_file-name_f
+irst
+414 name2=wa_file-name_l
+ast
+415 name3=wa_file-name_l
+ast2
+416 name4=wa_file-name_m
+iddle)).
+417
+418 centraldatagroup=COND#(WHENpartnercategory=3
+419 THENVALUE#(namegroup1=wa_file-name_fir
+st
+420 namegroup2=wa_file-name_las
+t)).
+421 ENDFORM.
+422 FORMfill_address_vendor.
+423 CLEAR:it_maildata[],it_faxdata[],it_telephondata[].
+424
+425 addressdata=VALUE#(
+426 street =wa_file-street
+427 str_suppl1 =wa_file-str_suppl1
+428 str_suppl2 =wa_file-str_suppl2
+429 str_suppl3 =wa_file-str_suppl3
+430 location =wa_file-location
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 25
+431 building =wa_file-building
+432 room_no =wa_file-roomnumber
+433 floor =wa_file-floor
+434 district =wa_file-district
+435 home_city =wa_file-home_city
+436 postl_cod1 =wa_file-postl_cod1
+437 city =wa_file-city
+438 country =wa_file-country
+439 region =wa_file-region
+440 langu ='E'
+441 languiso ='EN'
+442 time_zone =wa_file-time_zone
+443 validfromdate=COND#(WHENwa_file-valid_fromISNOTINITIAL
+444 THEN {wa_file-valid_from+6(4)}{wa_file-v
+alid_from+3(2)}{wa_file-valid_from+0(2)}
+445 ELSE'')
+446 validtodate =COND#(WHENwa_file-valid_toISNOTINITIAL
+447 THEN {wa_file-valid_to+6(4)}{wa_file-val
+id_to+3(2)}{wa_file-valid_to+0(2)}
+448 ELSE'')
+449 ).
+450
+451 "TelephoneData
+452 it_telephondata=VALUE#(
+453 (country=wa_file-countrytelephone=wa_file-mob_numberstd_no=
+'X'r_3_user='3'consnumber='001'home_flag='X')
+454 (country=wa_file-countrytelephone=wa_file-tel_numberstd_no=
+'X'r_3_user='1'consnumber='002'home_flag='X')
+455 ).
+456
+457 "Ifsecondphoneexists
+458 IFwa_file-tel_number_3ISNOTINITIAL.
+459 it_telephondata=VALUE#(BASEit_telephondata
+460 (country=wa_file-countrytelephone=wa_file-tel_number_3std_n
+o='X'r_3_user='1'consnumber='003'home_flag='X')
+461 ).
+462 ENDIF.
+463
+464 "CompactEmailandFaxassignment
+465 it_faxdata =VALUE#((fax=wa_file-fax)).
+466 it_maildata=VALUE#((e_mail=wa_file-smtp_addrstd_no='X'std_r
+ecip='X'home_flag='X'consnumber='001')).
+467
+468 IFwa_file-email_1ISNOTINITIAL.
+469 it_maildata=VALUE#(BASEit_maildata
+470 (e_mail=wa_file-email_1std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+471 ).
+472 ENDIF.
+473 IFwa_file-email_2ISNOTINITIAL.
+474 it_maildata=VALUE#(BASEit_maildata
+475 (e_mail=wa_file-email_2std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+476 ).
+477 ENDIF.
+478 IFwa_file-email_3ISNOTINITIAL.
+479 it_maildata=VALUE#(BASEit_maildata
+480 (e_mail=wa_file-email_3std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+481 ).
+482 ENDIF.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 26
+483 IFwa_file-email_4ISNOTINITIAL.
+484 it_maildata=VALUE#(BASEit_maildata
+485 (e_mail=wa_file-email_4std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+486 ).
+487 ENDIF.
+488 IFwa_file-email_5ISNOTINITIAL.
+489 it_maildata=VALUE#(BASEit_maildata
+490 (e_mail=wa_file-email_5std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+491 ).
+492 ENDIF.
+493 IFwa_file-email_6ISNOTINITIAL.
+494 it_maildata=VALUE#(BASEit_maildata
+495 (e_mail=wa_file-email_6std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+496 ).
+497 ENDIF.
+498
+499 ENDFORM.
+500 *& *
+501 *&FormCALL_BAPI_BUPA_CREATE
+502 *& *
+503 *&text
+504 *& *
+505 *& > p1 text
+506 *&< p2 text
+507 *& *
+508 FORMcall_bapi_bupa_create.
+509
+510 CLEARbusinesspartner.
+511 CALLFUNCTION'BAPI_BUPA_CREATE_FROM_DATA'
+512 EXPORTING
+513 businesspartnerextern =businesspartnerextern
+514 partnercategory =partnercategory
+515 partnergroup =partnergroup
+516 centraldata =centraldata
+517 centraldataperson =centraldataperson
+518 centraldataorganization=centraldataorganization
+519 centraldatagroup =centraldatagroup
+520 addressdata =addressdata
+521 IMPORTING
+522 businesspartner =businesspartner
+523 TABLES
+524 telefondata =it_telephondata
+525 faxdata =it_faxdata
+526 e_maildata =it_maildata
+527 **** addressnotes =it_addressnotes
+528 return =return.
+529
+530 w_log=CORRESPONDING#(wa_file).
+531 w_log-bpartner=COND#(WHENbusinesspartnerexternISNOTINITIALTHE
+Nbusinesspartnerextern
+532 WHENbusinesspartnerISNOTINITIALTHENbusi
+nesspartner
+533 ELSEwa_file-bpartner).
+534 IFbusinesspartnerISNOTINITIAL.
+535 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'
+536 EXPORTING
+537 wait='X'.
+538
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 27
+539 WAITUPTO2SECONDS.
+540
+541 IFwa_file-stcd3ISNOTINITIALANDwa_file-taxtypeISNOTINITIAL.
+542 MODIFYdfkkbptaxnumFROM@(VALUE#(
+543 client =sy-mandt
+544 partner =w_log-bpartner
+545 taxtype =wa_file-taxtype
+546 taxnum =wa_file-stcd3
+547 taxnumxl=''
+548 )).
+549
+550 IFsy-subrc=0.
+551 COMMITWORK.
+552 w_log-message='BPVENDORCREATED/UPDATED:TAXUPDATED'.
+553 ELSE.
+554 w_log-message='BPVENDORCREATED/UPDATED:TAXTABLEMODIFYFAI
+LED'.
+555 ENDIF.
+556 ELSE.
+557 w_log-message='BPVENDORCREATED/UPDATED:TAXNUMBERMISSINGIN
+FILE'.
+558 ENDIF.
+559 ENDIF.
+560 IFline_exists(return[type='E']).
+561 w_log-message= {w_log-message}/ERRORS: &&
+562 REDUCEstring(INITm=``
+563 FORwaINreturnWHERE(type='E')
+564 NEXTm=COND#(WHENm=``THENwa-message
+565 ELSE {m};{wa-message} )
+).
+566 ENDIF.
+567
+568 IFbusinesspartnerexternISNOTINITIAL.
+569 businesspartner= businesspartnerextern.
+570 ENDIF.
+571 ENDFORM.
+572 FORMadd_vendor_roles.
+573 DATA:businesspartnerroleTYPEbapibus1006_bproles-partnerrole,
+574 lv_role_status TYPEstring.
+575 "FLVN00:FIVendor(CompanyCodeData)
+576 "FLVN01:Supplier(PurchasingData)
+577
+578 REFRESH:return.
+579
+580 LOOPATVALUEchar10_t(('FLVN00')('FLVN01'))INTODATA(lv_role)
+.
+581 businesspartnerrole=lv_role.
+582 CALLFUNCTION'BAPI_BUPA_ROLE_ADD_2'
+583 EXPORTING
+584 businesspartner =businesspartner
+585 businesspartnerrole=businesspartnerrole
+586 validfromdate =sy-datum
+587 validuntildate ='99991231'
+588 TABLES
+589 return =return.
+590 IFNOTline_exists(return[type='E']).
+591 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+592 lv_role_status= {lv_role_status}{lv_role}Added. .
+593 ELSE.
+594 lv_role_status= {lv_role_status}{lv_role}Fail:{return[ty
+pe='E']-message}. .
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 28
+595 ENDIF.
+596 CLEAR:businesspartnerrole.
+597 ENDLOOP.
+598
+599 w_log-message= {w_log-message}Roles:{lv_role_status}.
+600 IFwa_file-isecISNOTINITIAL.
+601 industrysector=wa_file-isec.
+602 industrysectorkeysystem='0001'.
+603 defaultindustry=''.
+604
+605 CALLFUNCTION'BAPI_INDUSTRYSECTOR_ADD'
+606 EXPORTING
+607 businesspartner =businesspartner
+608 industrysectorkeysystem=industrysectorkeysystem
+609 industrysector =industrysector
+610 defaultindustry =defaultindustry
+611 TABLES
+612 return =return.
+613
+614 IFline_exists(return[type='E'])ORline_exists(return[type
+='A']).
+615 w_log-message= {w_log-message}IndustryAddFailed: &&
+616 REDUCEstring(INITm=``
+617 FORwaINreturnWHERE(type='E'ORtype='A
+')
+618 NEXTm=COND#(WHENm=``THENwa-message
+619 ELSE {m};{wa-message} )
+).
+620 ELSE.
+621 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+622 w_log-message= {w_log-message}IndustrySector{industrysecto
+r}Added..
+623 ENDIF.
+624 ENDIF.
+625
+626 REFRESH:return.
+627
+628 IFwa_file-identificationcategoryISNOTINITIALANDwa_file-identific
+ationnumberISNOTINITIAL.
+629 DATA:lv_id_from_dateTYPEdats,
+630 lv_id_to_date TYPEdats.
+631
+632 "ConvertDatestoInternalFormat
+633 IFwa_file-id_from_dateISNOTINITIAL.
+634 CALLFUNCTION'CONVERT_DATE_TO_INTERNAL'
+635 EXPORTING
+636 date_external=wa_file-id_from_date
+637 IMPORTING
+638 date_internal=lv_id_from_date
+639 EXCEPTIONS
+640 OTHERS =0.
+641 ENDIF.
+642
+643 IFwa_file-id_to_dateISNOTINITIAL.
+644 CALLFUNCTION'CONVERT_DATE_TO_INTERNAL'
+645 EXPORTING
+646 date_external=wa_file-id_to_date
+647 IMPORTING
+648 date_internal=lv_id_to_date
+649 EXCEPTIONS
+650 OTHERS =0.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 29
+651 ENDIF.
+652
+653 CALLFUNCTION'BAPI_IDENTIFICATION_ADD'
+654 EXPORTING
+655 businesspartner =businesspartner
+656 identificationcategory=CONVbu_id_category(wa_file-identifica
+tioncategory)
+657 identificationnumber =CONVbu_id_number(wa_file-identificati
+onnumber)
+658 identification =VALUEbapibus1006_identification(
+659 identrydate =sy-datum
+660 idvalidfromdate =lv_id_from_date
+661 idvalidtodate =lv_id_to_date)
+662 TABLES
+663 return =return.
+664
+665 "LogonlyErrorsusingREDUCE
+666 IFline_exists(return[type='E'])ORline_exists(return[type
+='A']).
+667 w_log-message= {w_log-message}ID{wa_file-identificationnumb
+er}Error: &&
+668 REDUCEstring(INITm=``
+669 FORwaINreturnWHERE(type='E'ORtype=
+'A')
+670 NEXTm=COND#(WHENm=``THENwa-message
+671 ELSE {m};{wa-message}
+)).
+672 ELSE.
+673 "CommitandWaittofinalizeBPbuffersynchronization
+674 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+675 w_log-message= {w_log-message}ID{wa_file-identificationnumb
+er}Added. .
+676 ENDIF.
+677
+678 CLEAR:lv_id_from_date,lv_id_to_date,return.
+679 ENDIF.
+680
+681 iv_partner= {businesspartnerALPHA=IN}.
+682 wa_file-bpartner=iv_partner.
+683 ENDFORM.
+684 *& *
+685 *&FormUPLOAD_BANK_TO_BP
+686 *& *
+687 *&text
+688 *& *
+689 *& > p1 text
+690 *&< p2 text
+691 *& *
+692 FORMupload_bank_to_bp.
+693 DATA:et_return TYPETABLEOFbapiret2,
+694 et_bank TYPESTANDARDTABLEOFbapibus1006_bankdetails,
+695 et_return1 TYPESTANDARDTABLEOFbapiret2,
+696 ls_bnka_ret TYPEbapiret2,
+697 lv_bank_tempTYPEcLENGTH10.
+698
+699 CLEARiv_partner.
+700
+701 iv_partner= {wa_file-bpartnerALPHA=IN}.
+702
+703 "HandleBankMasterData(bnka)
+704 SELECTSINGLEbanklFROMbnkaINTO@DATA(lv_exists)
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 30
+705 WHEREbanks=@wa_file-banksANDbankl=@wa_file-bankl.
+706
+707 IFsy-subrc<>0.
+708 "UseBAPIinsteadofdirectINSERTBNKA
+709 CALLFUNCTION'BAPI_BANK_CREATE'
+710 EXPORTING
+711 bank_ctry =wa_file-banks "++fieldnamech
+angesbyHemangReqBy:OmPrakashon25/02/2026
+712 bank_key =wa_file-bankl
+713 bank_address=VALUE bapi1011_address(
+714 bank_name =wa_file-banka
+715 swift_code =wa_file-swift
+716 region =wa_file-region_1
+717 street =wa_file-street_1
+718 city =wa_file-city_1
+719 bank_branch=wa_file-brnch)
+720 IMPORTING
+721 return =ls_bnka_ret.
+722 IFls_bnka_ret-type<>'E'.
+723 COMMITWORKANDWAIT."EnsureBNKAisavailableforthenextstep
+724 w_log-message= {w_log-message}BNKACreated..
+725 ELSE.
+726 w_log-message= {w_log-message}ERRORcreatingBNKA:{ls_bnka_
+ret-message}.
+727 ENDIF.
+728 ELSE.
+729 "UpdateexistingBankMasterusingstandardSQLifdetailschanged
+730 UPDATEbnkaSETprovz=@wa_file-region_1,stras=@wa_file-street_1
+,
+731 ort01=@wa_file-city_1,brnch=@wa_file-brnch,
+732 banka=@wa_file-banka,swift=@wa_file-swift
+733 WHEREbanks=@wa_file-banksANDbankl=@wa_file-bankl.
+734
+735 COMMITWORKANDWAIT.
+736 w_log-message= {w_log-message}BNKAUpdated..
+737 ENDIF.
+738
+739 DATA(lv_bank_id)=wa_file-bank_id.
+740
+741 IFlv_bank_idISINITIAL.
+742 CALLFUNCTION'BUPA_BANKDETAILS_GET'
+743 EXPORTING
+744 iv_partner =iv_partner
+745 iv_valid_date =sy-datlo
+746 TABLES
+747 et_bankdetails=et_bank
+748 et_return =et_return1.
+749
+750 lv_bank_temp=lines(et_bank)+1.
+751 lv_bank_id= {lv_bank_tempALPHA=IN}.
+752 ENDIF.
+753
+754 CALLFUNCTION'BUPA_BANKDETAIL_ADD'
+755 EXPORTING
+756 iv_partner =iv_partner
+757 iv_bkvid =CONVbu_bkvid(lv_bank_id)
+758 is_bankdetail=VALUEbapibus1006_bankdetail(
+759 bank_ctry=wa_file-banks
+760 bank_key =wa_file-bankl
+761 bank_acct=wa_file-bankn
+762 accountholder=wa_file-koinh
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 31
+763 bank_ref =wa_file-bkref
+764 ctrl_key =wa_file-controlkey
+765 bankaccountname=wa_file-ebpp_accname)
+766 TABLES
+767 et_return =et_return.
+768
+769 IFNOTline_exists(et_return[type='E']).
+770 COMMITWORKANDWAIT.
+771 w_log-message= {w_log-message}BankDetails(ID:{lv_bank_id})
+Added/Updated..
+772 ELSE.
+773 w_log-message= {w_log-message}BankAddFailed: &&
+774 REDUCEstring(INITm=``
+775 FORwaINet_returnWHERE(type='E')
+776 NEXTm=COND#(WHENm=``THENwa-message
+777 ELSE {m};{wa-message} )
+).
+778 ENDIF.
+779 ENDFORM.
+780 *& *
+781 *&Formextend_bp
+782 *& *
+783 *&text
+784 *& *
+785 *& > p1 text
+786 *&< p2 text
+787 *& *
+788 FORMextend_bp.
+789 LOOPATit_file_extendINTOwa_file_extend.
+790 CLEARw_log_ex.
+791 MOVE-CORRESPONDINGwa_file_extendTOw_log_ex.
+792 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+793 EXPORTING
+794 input =wa_file_extend-bpartner
+795 IMPORTING
+796 output=wa_file_extend-bpartner.
+797 SELECTSINGLEpartner FROMbut000INTOl_partnerWHEREpartner= w
+a_file_extend-bpartner.
+798 IFsy-subrc=0.
+799 businesspartner=wa_file_extend-bpartner.
+800 SELECTSINGLE*FROMbut000INTOwa_but000WHEREpartner=wa_file
+_extend-bpartnerANDpartner_guidNE''.
+801 IFsy-subrc=0.
+802 SELECTSINGLEvendorFROMcvi_vend_linkINTOlv_vendor
+803 WHEREpartner_guid=wa_but000-partner_guid.
+804 IFsy-subrc=0.
+805 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+806 REFRESH:t_lfa1[].
+807 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=l
+v_vendor.
+808 ENDIF.
+809 ENDIF.
+810
+811 ls_vendors-header-object_instance-lifnr=lv_vendor.
+812 ls_vendors-header-object_task='U'.
+813
+814 IFwa_file_extend-bukrsISNOTINITIAL.
+815 REFRESH:lt_company[].
+816 CLEARls_company.
+817 ls_company-task ='M'.
+818 ls_company-data_key-bukrs =wa_file_extend-bukrs.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 32
+819 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+820 EXPORTING
+821 input =wa_file_extend-akont
+822 IMPORTING
+823 output=ls_company-data-akont.
+824 ls_company-data-zterm =wa_file_extend-zterm.
+825 ls_company-datax-akont ='X'.
+826 ls_company-datax-zterm ='X'.
+827 ls_company-data-zuawa=wa_file_extend-zuawa."sortkey
+828 ls_company-datax-zuawa='X'.
+829 ls_company-data-mindk=wa_file_extend-mindk.
+830 ls_company-datax-mindk='X'.
+831 ls_company-data-cerdt =COND#(WHENwa_file-cerdtISNOTINITI
+ALTHEN {wa_file-cerdt+6(4)}{wa_file-cerdt+3(2)}{wa_file-cerdt+0(2
+)} ELSE'').
+832 ls_company-datax-cerdt='X'.
+833 ls_company-data-reprf=wa_file_extend-reprf.
+834 ls_company-datax-reprf='X'.
+835
+836 APPENDls_companyTOls_vendors-company_data-company.
+837
+838 ENDIF.
+839
+840 IFwa_file_extend-ekorgISNOTINITIAL.
+841 REFRESH:et_parvw[],lt_purchasing[].
+842 CLEAR:ls_purchasing.
+843 ls_purchasing-task ='M'.
+844 ls_purchasing-data_key-ekorg=wa_file_extend-ekorg.
+"PURCHASINGORGANIZATION
+845 ls_purchasing-data-waers=wa_file_extend-waers.
+846 ls_purchasing-datax-waers='X'.
+847
+848 ls_purchasing-data-zterm=wa_file_extend-zterm.
+849 ls_purchasing-datax-zterm='X'.
+850 "ADDEDBYKEDARSUBRATON03/08/2018FORSALESPERSONANDTELEP
+HONENUMBERUPDATE
+851 ls_purchasing-data-verkf=wa_file_extend-verkf.
+852 ls_purchasing-datax-verkf='X'.
+853
+854 ls_purchasing-data-telf1=wa_file_extend-telf1.
+855 ls_purchasing-datax-telf1='X'.
+856 "ENDEDBYKEDARSUBRATON03/08/2018FORSALESPERSONANDTELEP
+HONENUMBERUPDATE
+857 ls_purchasing-data-ekgrp=wa_file_extend-ekgrp.
+858 ls_purchasing-datax-ekgrp='X'.
+859
+860 ls_purchasing-data-kalsk =wa_file_extend-kalsk.
+"SCHEMAGROUP,VENDOR
+861 ls_purchasing-datax-kalsk ='X'.
+862
+863 ls_purchasing-data-lebre ='X'.
+"SERVICE-BASEDINVOICEVERIFICATION
+864 ls_purchasing-datax-lebre ='X'.
+865
+866
+867 ls_purchasing-data-webre ='X'."WA_FILE-WEBRE.
+"GRBASEDINVOICEVERIFICATION
+868 ls_purchasing-datax-webre ='X'.
+869
+870 CALLMETHODvmd_ei_api_check=>get_mand_partner_functions
+871 EXPORTING
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 33
+872 iv_ktokk=lfa1-ktokk
+873 IMPORTING
+874 et_parvw=et_parvw.
+875
+876 LOOPATet_parvwINTODATA(wa_parvw).
+877 SELECTSINGLEparvwFROMwyt3
+878 INTO@DATA(lv_pf_exists)
+879 WHERElifnr=@lv_vendor
+880 ANDekorg=@wa_file_extend-ekorg
+881 ANDparvw=@wa_parvw-parvw.
+882
+883 APPENDVALUE#(
+884 task =COND#(WHENlv_pf_existsISNOTINITIALTHEN'M'
+ELSE'I')
+885 data_key=VALUE#(parvw=wa_parvw-parvw)
+886 data =VALUE#(partner=lv_vendor)
+887 datax =VALUE#(partner='X')
+888 )TOlt_purch_func.
+889 ENDLOOP.
+890
+891 ls_purchasing-functions-functions= lt_purch_func[].
+892 APPENDls_purchasingTOls_vendors-purchasing_data-purchasing.
+893 ENDIF.
+894 APPENDls_vendorsTOgs_vmds_extern-vendors.
+895
+896 vmd_ei_api=>initialize().
+897 * CALLTHEMETHODFORCREATIONOFVENDOR.
+898 CALLMETHODvmd_ei_api=>maintain_bapi
+899 EXPORTING
+900 is_master_data =gs_vmds_extern
+901 IMPORTING
+902 es_master_data_correct =gs_vmds_succ
+903 es_message_correct =gs_succ_messages
+904 es_master_data_defective=gs_vmds_error
+905 es_message_defective =gs_err_messages.
+906 IFgs_err_messages-is_errorISINITIAL.
+907 COMMITWORK.
+908 WAITUPTO2SECONDS.
+909 w_log_ex-msgty='S'.
+910 w_log_ex-message= Vendor{lv_vendor}extendedsuccessfully.
+.
+911 CLEARw_msg.
+912 ELSE.
+913 ROLLBACKWORK.
+914 w_log_ex-msgty='E'.
+915 LOOPATgs_err_messages-messagesINTODATA(ls_msg).
+916 IFw_log_ex-messageISINITIAL.
+917 w_log_ex-message=ls_msg-message.
+918 ELSE.
+919 w_log_ex-message= {w_log_ex-message}/{ls_msg-message
+}.
+920 ENDIF.
+921 ENDLOOP.
+922 ENDIF.
+923 APPENDw_log_exTOt_log_ex.
+924 ELSE.
+925 MESSAGE:'PLEASEPROVIDEEXISTINGBPNO'TYPE'I'DISPLAYLIKE'E
+'.
+926 LEAVELIST-PROCESSING.
+927 ENDIF.
+928 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 34
+929 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+930 REFRESH:lt_purch_func[],
+931 ls_vendors-company_data-company[],
+932 ls_vendors-purchasing_data-purchasing[],
+933 gs_vmds_extern-vendors[].
+934 CLEAR:wa_file_extend,gs_vmds_extern,ls_vendors,lv_vendor,busine
+sspartner.
+935 ENDLOOP.
+936 ENDFORM.
+937 *& *
+938 *&Formdownload_log_to_excel
+939 *& *
+940 *&text
+941 *& *
+942 *& > p1 text
+943 *&< p2 text
+944 *& *
+945 FORMdownload_log_to_excel.
+946 DATA:lv_filenameTYPEstring,
+947 lv_path TYPEstring,
+948 lv_fullpathTYPEstring.
+949
+950 cl_gui_frontend_services=>file_save_dialog(
+951 EXPORTING
+952 default_extension='XLSX'
+953 default_file_name= BP_Vendor_Log_{sy-datum}_{sy-uzeit}.xls
+954 CHANGING
+955 filename =lv_filename
+956 path =lv_path
+957 fullpath =lv_fullpath).
+958
+959 IFlv_fullpathISNOTINITIAL.
+960 CALLFUNCTION'GUI_DOWNLOAD'
+961 EXPORTING
+962 filename =lv_fullpath
+963 filetype ='ASC'
+964 write_field_separator='X'"MakesitreadablebyExcel
+965 confirm_overwrite ='X'
+966 TABLES
+967 data_tab =t_log
+968 EXCEPTIONS
+969 file_write_error =1
+970 OTHERS =2.
+971
+972 IFsy-subrc=0.
+973 MESSAGE'Logdownloadedsuccessfully.'TYPE'S'.
+974 ENDIF.
+975 ENDIF.
+976 ENDFORM.
+977 *& *
+978 *&Formdisplay_log
+979 *& *
+980 *&text
+981 *& *
+982 *& > p1 text
+983 *&< p2 text
+984 *& *
+985 FORMdisplay_log.
+986 "InlineFieldCatalogDefinition(Avoidslongmanually-builttables)
+987 DATA(lt_fcat)=VALUEslis_t_fieldcat_alv(
+988 (fieldname='BPARTNER' seltext_m='VendorCode'hotspot='X'
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 35
+)
+989 (fieldname='PARTN_GRP' seltext_m='VendorAccountgroup')
+990 (fieldname='NAME_FIRST' seltext_m='Name1')
+991 (fieldname='NAME_LAST' seltext_m='Name2')
+992 (fieldname='STCD3' seltext_m='GSTTaxNumber')
+993 (fieldname='J_1IPANNO' seltext_m='PanNo')
+994 (fieldname='Flag' seltext_m='ErrorType')
+995 (fieldname='MESSAGE' seltext_m='LogDetails'outputlen=
+255)
+996 ).
+997
+998 DATA(ls_layout)=VALUEslis_layout_alv(
+999 colwidth_optimize='X'
+1000 zebra ='X'
+1001 ).
+1002
+1003 CALLFUNCTION'REUSE_ALV_GRID_DISPLAY'
+1004 EXPORTING
+1005 i_callback_program =sy-repid
+1006 i_callback_user_command='USER_COMMAND'
+1007 i_callback_top_of_page ='TOP_OF_PAGE'
+1008 is_layout =ls_layout
+1009 it_fieldcat =lt_fcat
+1010 TABLES
+1011 t_outtab =t_log
+1012 EXCEPTIONS
+1013 program_error =1
+1014 OTHERS =2.
+1015 ENDFORM.
+1016 *& *
+1017 *&Formdownload_log_to_excel_ex
+1018 *& *
+1019 *&text
+1020 *& *
+1021 *& > p1 text
+1022 *&< p2 text
+1023 *& *
+1024 FORMdownload_log_to_excel_ex.
+1025 DATA:lv_filenameTYPEstring,
+1026 lv_path TYPEstring,
+1027 lv_fullpathTYPEstring.
+1028
+1029 cl_gui_frontend_services=>file_save_dialog(
+1030 EXPORTING
+1031 default_extension='XLSX'
+1032 default_file_name= BP_Vendor__Extension_Log_{sy-datum}_{sy-uz
+eit}.xls
+1033 CHANGING
+1034 filename =lv_filename
+1035 path =lv_path
+1036 fullpath =lv_fullpath).
+1037
+1038 IFlv_fullpathISNOTINITIAL.
+1039 CALLFUNCTION'GUI_DOWNLOAD'
+1040 EXPORTING
+1041 filename =lv_fullpath
+1042 filetype ='ASC'
+1043 write_field_separator='X'"MakesitreadablebyExcel
+1044 confirm_overwrite ='X'
+1045 TABLES
+1046 data_tab =t_log_ex
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 36
+1047 EXCEPTIONS
+1048 file_write_error =1
+1049 OTHERS =2.
+1050
+1051 IFsy-subrc=0.
+1052 MESSAGE'Logdownloadedsuccessfully.'TYPE'S'.
+1053 ENDIF.
+1054 ENDIF.
+1055 ENDFORM.
+1056 *& *
+1057 *&Formdisplay_log_ex
+1058 *& *
+1059 *&text
+1060 *& *
+1061 *& > p1 text
+1062 *&< p2 text
+1063 *& *
+1064 FORMdisplay_log_ex.
+1065 "InlineFieldCatalogDefinition(Avoidslongmanually-builttables)
+1066 DATA(lt_fcat)=VALUEslis_t_fieldcat_alv(
+1067 (fieldname='BPARTNER'seltext_m='VendorCode'hotspot='X')
+1068 (fieldname='BUKRS' seltext_m='CompanyCode')
+1069 (fieldname='EKORG' seltext_m='PurchaseOrganization')
+1070 (fieldname='MSGTY' seltext_m='Status'icon='X')
+1071 (fieldname='MESSAGE' seltext_m='LogDetails'outputlen=255)
+1072 ).
+1073
+1074 DATA(ls_layout)=VALUEslis_layout_alv(
+1075 colwidth_optimize='X'
+1076 zebra ='X'
+1077 ).
+1078
+1079 CALLFUNCTION'REUSE_ALV_GRID_DISPLAY'
+1080 EXPORTING
+1081 i_callback_program =sy-repid
+1082 i_callback_user_command='USER_COMMAND'
+1083 i_callback_top_of_page ='TOP_OF_PAGE_EX'
+1084 is_layout =ls_layout
+1085 it_fieldcat =lt_fcat
+1086 TABLES
+1087 t_outtab =t_log_ex
+1088 EXCEPTIONS
+1089 program_error =1
+1090 OTHERS =2.
+1091 ENDFORM.
+1092 *& *
+1093 *&Formuser_command
+1094 *& *
+1095 *&text
+1096 *& *
+1097 *& > p1 text
+1098 *&< p2 text
+1099 *& *
+1100 "Optional:AddthistomaketheMaterialNumberclickable
+1101 FORMuser_commandUSINGr_ucommLIKEsy-ucomm
+1102 rs_selfieldTYPEslis_selfield.
+1103 CASEr_ucomm.
+1104 WHEN'&IC1'."StandardHotspot/Double-clickcode
+1105 **** IFrs_selfield-fieldname='BPARTNER'ANDrs_selfield-valueIS
+NOTINITIAL.
+1106 **** SETPARAMETERID'BPA'FIELDrs_selfield-value.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 37
+1107 **** CALLTRANSACTION'BP'ANDSKIPFIRSTSCREEN.
+1108 **** ENDIF.
+1109 IFrs_selfield-fieldname='BPARTNER'ANDrs_selfield-valueISNOT
+INITIAL.
+1110
+1111 "1.Createanavigationrequest
+1112 DATA(lo_request)=NEWcl_bupa_navigation_request().
+1113 lo_request->set_partner_number( {rs_selfield-valueALPHA=IN
+} )."Ensureleadingzeros
+1114 lo_request->set_bupa_activity('03')."03=Display,02=Chan
+ge
+1115
+1116 "2.SetUIoptions(optional:hidethelocator/historysidebar)
+1117 DATA(lo_options)=NEWcl_bupa_dialog_joel_options().
+1118 lo_options->set_locator_visible(abap_false).
+1119
+1120 "3.StarttheBPtransactionwiththisspecificnavigation
+1121 cl_bupa_dialog_joel=>start_with_navigation(
+1122 EXPORTING
+1123 iv_request =lo_request
+1124 iv_options =lo_options
+1125 iv_in_new_internal_mode=abap_true"Opensinthesamewind
+ow
+1126 ).
+1127 ENDIF.
+1128 ENDCASE.
+1129 ENDFORM.
+1130 *& *
+1131 *&FORMTOP_OF_PAGE
+1132 *& *
+1133 FORMtop_of_page.
+1134 DATA:lt_headerTYPEslis_t_listheader,
+1135 lv_total TYPEi,
+1136 lv_errorsTYPEi.
+1137
+1138 "Calculatestatsfortheheader
+1139 lv_total =lines(t_log).
+1140 lv_errors=REDUCEi(INITcount=0FORmINt_logWHERE(msgtyCA'
+EA')NEXTcount=count+1).
+1141
+1142 "1.MainTitle(TypeH)
+1143 APPENDVALUE#(typ='H'info='BPVendorUploadExecutionLog')TO
+lt_header.
+1144
+1145 "2.SelectionInfo(TypeS)
+1146 APPENDVALUE#(typ='S'key='Date:' info= {sy-datumDATE=U
+SER} )TOlt_header.
+1147 APPENDVALUE#(typ='S'key='User:' info= {sy-uname} )TO
+lt_header.
+1148
+1149 "3.SummaryAction(TypeA)
+1150 APPENDVALUE#(typ='A'info= TotalRecords:{lv_total} )TOl
+t_header.
+1151 APPENDVALUE#(typ='A'info= ErrorsFound:{lv_errors} )TOlt
+_header.
+1152
+1153 CALLFUNCTION'REUSE_ALV_COMMENTARY_WRITE'
+1154 EXPORTING
+1155 it_list_commentary=lt_header.
+1156 ENDFORM.
+1157 *& *
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 38
+1158 *&FORMTOP_OF_PAGE
+1159 *& *
+1160 FORMtop_of_page_ex.
+1161 DATA:lt_headerTYPEslis_t_listheader,
+1162 lv_total TYPEi,
+1163 lv_errorsTYPEi.
+1164
+1165 "Calculatestatsfortheheader
+1166 lv_total =lines(t_log_ex).
+1167 lv_errors=REDUCEi(INITcount=0FORmINt_log_exWHERE(msgtyC
+A'EA')NEXTcount=count+1).
+1168
+1169 "1.MainTitle(TypeH)
+1170 APPENDVALUE#(typ='H'info='BPVendorExtensionUploadExecution
+Log')TOlt_header.
+1171
+1172 "2.SelectionInfo(TypeS)
+1173 APPENDVALUE#(typ='S'key='Date:' info= {sy-datumDATE=U
+SER} )TOlt_header.
+1174 APPENDVALUE#(typ='S'key='User:' info= {sy-uname} )TO
+lt_header.
+1175
+1176 "3.SummaryAction(TypeA)
+1177 APPENDVALUE#(typ='A'info= TotalRecords:{lv_total} )TOl
+t_header.
+1178 APPENDVALUE#(typ='A'info= ErrorsFound:{lv_errors} )TOlt
+_header.
+1179
+1180 CALLFUNCTION'REUSE_ALV_COMMENTARY_WRITE'
+1181 EXPORTING
+1182 it_list_commentary=lt_header.
+1183 ENDFORM.
+1184 FORMcall_bapi_bupa_central_change.
+1185 CLEARbusinesspartner.
+1186 DATA:tax_returnTYPEbapiret2_t.
+1187 x_save_add-save_addr='X'.
+1188 businesspartner =wa_file-bpartner.
+1189
+1190 "MapdatabasedonPartnerCategoryusingmodernVALUEandSWITCHexp
+ressions
+1191 CASEpartnercategory.
+1192 WHEN1.
+1193 centraldatapersonx=VALUE#(firstname =abap_true
+1194 lastname =abap_true
+1195 birthname =abap_true
+1196 correspondlanguage =abap_true
+1197 correspondlanguageiso=abap_true).
+1198 chk_address =VALUE#(BASEchk_addresslangu='E'languis
+o='EN').
+1199 WHEN2.
+1200 centraldataorganizationx=VALUE#(name1=abap_true
+1201 name2=abap_true
+1202 name3=abap_true
+1203 name4=abap_true
+1204 loc_no_1=abap_true
+1205 loc_no_2=abap_true).
+1206 WHEN3.
+1207 central_groupx =VALUE#(namegroup1='X'
+1208 namegroup2='X').
+1209 ENDCASE.
+1210
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 39
+1211 CALLFUNCTION'BAPI_BUPA_CENTRAL_CHANGE'
+1212 EXPORTING
+1213 businesspartner =wa_file-bpartner
+1214 **** centraldata =centraldata
+1215 centraldataperson =centraldataperson
+1216 centraldataorganization =centraldataorganization
+1217 centraldatagroup =central_group
+1218 **** centraldata_x =centraldatax
+1219 centraldataperson_x =centraldatapersonx
+1220 centraldataorganization_x=centraldataorganizationx
+1221 centraldatagroup_x =central_groupx
+1222 duplicate_check_address =chk_address
+1223 TABLES
+1224 return =return
+1225 * ADDRESSDUPLICATES =
+1226 .
+1227 w_log=CORRESPONDING#(wa_file).
+1228
+1229 IFbusinesspartnerISNOTINITIAL.
+1230 "Synchronouscommit-wait='X'makes'WAITUPTO'unnecessary
+1231 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+1232
+1233 w_log-message=COND#(WHENline_exists(return[type='E'])
+1234 THEN'BUSINESSPARTNERISNOTCHANGED'
+1235 ELSE'BUSINESSPARTNERCHANGED').
+1236
+1237 "HandleTaxUpdateonlyifBPwassuccessful
+1238 **** IFNOTline_exists(return[type='E']).
+1239 **** IFwa_file-stcd3ISNOTINITIALANDwa_file-taxtypeISNOTINI
+TIAL.
+1240 **** wa_final_2-taxnum=wa_file-stcd3.
+1241 **** wa_final_2-taxtype= wa_file-taxtype.
+1242 ****
+1243 **** CALLFUNCTION'BAPI_BUPA_TAX_ADD'
+1244 **** EXPORTING
+1245 **** businesspartner=w_log-bpartner
+1246 **** taxtype =wa_final_2-taxtype
+1247 **** taxnumber =wa_final_2-taxnum
+1248 **** TABLES
+1249 **** return =tax_return.
+1250 **** IFsy-subrc=0.
+1251 **** COMMITWORKANDWAIT.
+1252 **** w_log-message= {w_log-message}&GSTUPDATED.
+1253 **** ELSE.
+1254 **** LOOPATtax_returnINTODATA(ls_ret_gst).
+1255 **** w_log-message= {w_log-message}/GST:{ls_ret_gst-m
+essage}.
+1256 **** ENDLOOP.
+1257 **** ENDIF.
+1258 **** ELSE.
+1259 **** w_log-message='BPCREATED/UPDATED:STCD3GSTMISSINGINFI
+LE'.
+1260 **** ENDIF.
+1261 **** ENDIF.
+1262
+1263 IFline_exists(return[type='E']).
+1264 w_log-message=return[type='E']-message.
+1265 ENDIF.
+1266
+1267 w_log-bpartner=COND#(WHENbusinesspartnerexternISNOTINITIAL
+1268 THENbusinesspartnerextern
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 40
+1269 ELSEbusinesspartner).
+1270
+1271 ENDIF.
+1272
+1273 "Finalglobalvariableupdate
+1274 businesspartner=COND#(WHENbusinesspartnerexternISNOTINITIAL
+1275 THENbusinesspartnerextern
+1276 ELSEbusinesspartner).
+1277 ENDFORM.
+1278 *& *
+1279 *&FormCREATE_BP_VENDOR
+1280 *& *
+1281 *&text
+1282 *& *
+1283 *& > p1 text
+1284 *&< p2 text
+1285 *& *
+1286 FORMchange_bp_vendor.
+1287 LOOPATit_file_extendASSIGNINGFIELD-SYMBOL(<fs_change>).
+1288 CLEAR:businesspartnerextern,
+1289 partnercategory,
+1290 partnergroup,
+1291 centraldata,
+1292 centraldataperson,
+1293 centraldataorganization,
+1294 addressdata.
+1295 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+1296 EXPORTING
+1297 input =<fs_change>-bpartner
+1298 IMPORTING
+1299 output=<fs_change>-bpartner.
+1300
+1301 CLEARbusinesspartnerextern.
+1302
+1303 IFwa_file-bpartnerISNOTINITIAL.
+1304 SELECTSINGLEpartnerFROMbut000INTO@DATA(lv_partner)WHEREpar
+tner=@<fs_change>-bpartner.
+1305 IFsy-subrc<>0.
+1306 businesspartnerextern=<fs_change>-bpartner.
+1307 ENDIF.
+1308 ENDIF.
+1309 IFlv_partnerISNOTINITIALAND<fs_change>-bpartnerISNOTINITIAL
+.
+1310 PERFORMcall_bapi_bupa_central_change.
+1311 ENDIF.
+1312
+1313 IFbusinesspartnerISNOTINITIAL.
+1314 "AddVendorRoles(FLVN00forFI,FLVN01forPurchasing)
+1315 PERFORMadd_vendor_roles.
+1316
+1317 SELECTSINGLElink~vendor
+1318 FROMbut000ASbp
+1319 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+1320 WHEREbp~partner=@wa_file-bpartner
+1321 INTO@DATA(lv_vend_id).
+1322 IFsy-subrc=0.
+1323 lv_vendor=lv_vend_id.
+1324 w_log-message= {w_log-message}LinkedVendor:{lv_vend_id}
+..
+1325 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 41
+1326 IFsy-subrc=0.
+1327 wa_file-lifnr=lfa1-lifnr.
+1328 ENDIF.
+1329 SELECTSINGLE*FROMbut020WHEREpartner=wa_file-bpartner.
+1330 REFRESH:t_lfa1[].
+1331 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=lv_
+vendor.
+1332
+1333 CREATEOBJECTlo_data.
+1334 CALLMETHODlo_data->create_vendor_data.
+1335 ENDIF.
+1336 SELECTSINGLElink~vendor
+1337 FROMbut000ASbp
+1338 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+1339 WHEREbp~partner=@wa_file-bpartner
+1340 INTO@lv_vend_id.
+1341 IFlv_vend_idISNOTINITIAL.
+1342 UPDATElfa1SETven_class=wa_file-ven_class
+1343 j_1ipanno=wa_file-j_1ipanno
+1344 j_1iexcd =wa_file-j_1iexcd
+1345 j_1iexrn =wa_file-j_1iexrn
+1346 j_1iexrg =wa_file-j_1iexrg
+1347 j_1iexdi =wa_file-j_1iexdi
+1348 j_1iexco =wa_file-j_1iexco
+1349 j_1ivtyp =wa_file-j_1ivtyp
+1350 j_1isern =wa_file-j_1isern
+1351 j_1kftbus=wa_file-j_1kftbus "JNewlyAdded
+1352 j_1kftind=wa_file-j_1kftind "JNewlyAdded
+1353 bahns =wa_file-bahns "JNewlyAdded
+1354 stenr =wa_file-stenr "JNewlyAdded
+1355 profs =wa_file-profs
+1356 WHERElifnr=lv_vendor.
+1357 COMMITWORKANDWAIT.
+1358 w_log-message= {w_log-message}LFA1datamodified. .
+1359 ENDIF.
+1360 ENDIF.
+1361 APPENDw_logTOt_log.
+1362 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+1363 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+1364 CLEAR:lv_vend_id,businesspartner,wa_file.
+1365 ENDLOOP.
+1366 ENDFORM.
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 42
+1 *& *
+2 *&Include ZMM_VEND_MASTER_TOP
+3 *& *
+4 *& *
+5 *& TABLESDECLARATION
+6 *& *
+7 TABLES:but000,lfa1,but020.
+8
+9 *& *
+10 *& TYPESDECLARATION
+11 *& *
+12 "++beginofchangesfornewtemplatebyHemangJoshi
+13 TYPES:BEGINOFty_file_bp,
+14 bpartner TYPEbu_partner, "1 BusinessPar
+tnerNumber
+15 partn_cat TYPEbu_type, "2 PartnerType
+(2=Org,1=Person)
+16 partn_grp TYPEbu_group, "3 BPGrouping
+17 title TYPEad_titletx, "4 Title
+18 name_first TYPEbu_nameor1, "5 Name1
+19 name_last TYPEbu_nameor2, "6 Name2
+20 name_last2 TYPEbu_nameor3, "7 Name3
+21 name_middle TYPEbu_nameor4, "8 Name4
+22 zz_bu_old TYPEchar20, "9 NEW:OldVen
+dorCode(adjustlengthifyouhaveadomain)
+23 searchterm1 TYPEbu_sort1, "10SearchTerm
+1
+24 searchterm2 TYPEbu_sort2, "11SearchTerm
+2
+25 building TYPEad_bldng, "12BUILDING
+26 roomnumber TYPEad_roomnum, "13ROOMNUMBER
+27 floor TYPEad_floor, "14FLOOR
+28 street TYPEad_street, "15STREET
+29 str_suppl1 TYPEad_strspp1, "16STREET1
+30 str_suppl2 TYPEad_strspp2, "17STREET2
+31 str_suppl3 TYPEad_strspp3, "18STREET3
+32 location TYPEad_lctn, "19LOCATION
+33 district TYPEad_city2, "20DISTRICT
+34 home_city TYPEad_city3, "21HOMECITY
+35 postl_cod1 TYPEad_pstcd1, "22PostalCode
+36 city TYPEad_city1, "23City
+37 country TYPEland1, "24Country
+38 region TYPEregio, "25Region(Gene
+ral)
+39 tel_number TYPEad_tlnmbr, "26Telephonenu
+mber
+40 mob_number TYPEad_tlnmbr, "27Mobilenumbe
+r
+41 * bpkind TYPEbu_bpkind, "28NEW:BPKind "removedNote:
+sequencechanged
+42 fax TYPEad_fxnmbr, "29FaxNumber
+43 smtp_addr TYPEad_smtpadr, "30Email0
+44 valid_from TYPEstring, "31ValidFrom(
+string;convertedlater)
+45 valid_to TYPEstring, "32ValidTo(st
+ring;convertedlater)
+46 partnertype TYPEbu_bpkind, "33PartnerType
+(freetextfromfile)
+47 identificationcategoryTYPEstring, "34Identificati
+onCategory
+48 identificationnumber TYPEstring, "35Identificati
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 43
+onNumber
+49 id_from_date TYPEstring, "36IDFromDate
+(string;convertedlater)
+50 id_to_date TYPEstring, "37IDToDate(
+string;convertedlater)
+51 tel_number_3 TYPEchar10, "38Telephoneno
+.3
+52 email_1 TYPEad_smtpadr, "39Email1
+53 email_2 TYPEad_smtpadr, "40Email2
+54 email_3 TYPEad_smtpadr, "41Email3
+55 email_4 TYPEad_smtpadr, "42Email4
+56 email_5 TYPEad_smtpadr, "42Email4
+57 email_6 TYPEad_smtpadr, "42Email4
+58 j_1iexcd TYPEj_1iexcd, "43J1IExcise
+Dep#
+59 j_1iexrn TYPEj_1iexrn, "44J1IExcise
+Range
+60 j_1iexrg TYPEj_1iexrg, "45J1IExcise
+Division
+61 j_1iexdi TYPEj_1iexdi, "46J1IExcise
+District
+62 j_1iexco TYPEj_1iexco, "47J1IExcise
+Commissionerate
+63 j_1ivtyp TYPEj_1ivtyp, "48J1IVendorT
+ype
+64 kunnr TYPEkna1-kunnr, "49CustomerNum
+ber(movedfromold#9)
+65 j_1ipanno TYPEj_1ipanno, "50PAN
+66 j_1isern TYPEj_1isern, "51ServiceTax
+Registration
+67 taxtype TYPEdfkkbptaxnum-taxtype,"52BPTaxNu
+mberCategory
+68 stcd3 TYPEstcd3, "53GSTNo.
+69 ven_class TYPEchar10, "54VendorClass
+70 isec TYPEbus_bupa_industry_sectors-isec,"55
+IndustrySector
+71 time_zone TYPEchar10, "56TimeZone
+72
+73 "CompanyCode57..65
+74 bukrs TYPElfb1-bukrs, "57CompanyCode
+75 akont TYPEakont, "58ReconAccoun
+t
+76 zuawa TYPEdzuawa, "59SortKey
+77 altkn TYPElfb1-altkn, "60PreviousAcc
+ountNumber
+78 mindk TYPEmindk, "61MinorityInd
+icator
+79 cerdt TYPEstring, "62Certificatio
+nDate(string;convertedlater) "char10 >string
+80 zterm TYPEdzterm, "63PaymentTerm
+s
+81 reprf TYPEreprf, "64DoubleInvoi
+ceCheck
+82 kverm TYPEkverm, "65AccountMemo
+/CheckFlag
+83
+84 "Payment(HouseBankID)66
+85 hbkid TYPEhbkid, "66NEW:HouseB
+ankID
+86
+87 "Purchasing67..87
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 44
+88 ekorg TYPEekorg, "67PurchasingO
+rganization
+89 waers TYPEwaers, "68Currency
+90 zterm_org TYPEdzterm, "69PaymentTerm
+s(Purchasing)
+91 verkf TYPEverkf, "70Responsible
+Salesperson
+92 inco1 TYPEinco1, "71IncotermsPa
+rt1
+93 inco1_l TYPEinco2_l, "72IncotermsLo
+cation1
+94 inco2 TYPEinco2, "73IncotermsPa
+rt2
+95 inco2_l TYPEinco3_l, "74IncotermsLo
+cation2
+96 webre TYPEwebre, "75GR-basedIV
+97 lebre TYPElebre, "76Service-base
+dIV
+98 kzaut TYPEkzaut, "77AutomaticPO
+Allowed
+99 lfabc TYPElfabc, "78ABCIndicato
+r
+100 stenr TYPEstenr, "79TANNumber
+101 profs TYPEprofs, "80MSMENumber
+102 j_1kftind TYPEindtyp, "81TypeofIndu
+stry
+103 j_1kftbus TYPEgestyp, "82TypeofBusi
+ness
+104 bahns TYPEbahns, "83TrainStatio
+n(CIN)
+105 telf1 TYPEtelf1, "84SupplierTel
+ephoneNo.
+106 ekgrp TYPEekgrp, "85PurchasingG
+roup
+107 kalsk TYPEkalsk, "86SchemaGroup
+108 parvw TYPEparvw, "87NEW:Partner
+Function(Purchasingoverride)
+109
+110 "Payment/Bank88..100
+111 banks TYPEbanks, "88BankCountry
+/RegionKey
+112 bank_id TYPEbu_bkvid, "89BPBankID
+113 bankl TYPEbankl, "90BankKey
+114 bankn TYPEbankn, "91BankAccount
+Number
+115 bkref TYPEbkref, "92RemainingBa
+nkAccountNo.
+116 koinh TYPEkoinh_fi, "93AccountHold
+erName
+117 ebpp_accname TYPEebpp_accname, "94User-defined
+BankAccountName
+118 banka TYPEbanka, "95NameofFina
+ncialInstitution
+119 region_1 TYPEregio, "96BankRegion
+(secondREGIO)
+120 street_1 TYPEbnka-stras, "97BankStreet
+121 city_1 TYPEort01, "98BankCity
+122 brnch TYPEbrnch, "99Branch
+123 swift TYPEbnka-swift, "100SwiftCode
+124
+125 "Other/Log/Keys101..103
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 45
+126 reason TYPEchar100, "101Reason
+127 lifnr TYPElifnr, "102VendorNumb
+er
+128 flag TYPEc, "103Flag
+129
+130 "Withholding104..114
+131 srno TYPEchar4, "104WHTSRNO(g
+roupkey)
+132 witht TYPEwitht, "105Withholding
+TaxType
+133 wt_subjct TYPEwt_subjct, "106Subjectto
+WHT?
+134 qsrec TYPEwt_qsrec, "107TypeofRec
+ipient
+135 wt_wtstcd TYPEwt_wtstcd, "108WHTIdentif
+icationNumber
+136 wt_withcd TYPEwt_withcd, "109WHTCode
+137 wt_exnr TYPEwt_exnr, "110ExemptionC
+ertificateNumber
+138 wt_exrt TYPEwt_exrt, "111ExemptionR
+ate
+139 wt_exdf TYPEstring, "112ExemptionF
+romDate
+140 wt_exdt TYPEstring, "113ExemptionT
+oDate
+141 wt_wtexrs TYPEwt_wtexrs, "114Reasonfor
+Exemption
+142 paymethod TYPElfb1-zwels, "115PaymentMet
+hod
+143 controlkey TYPElfbk-bkont, "116ControlKey
+144 ENDOFty_file_bp.
+145 TYPES:BEGINOFty_log.
+146 INCLUDETYPEty_file_bp.
+147 TYPES: msgty TYPEbapi_mtype,
+148 messageTYPEstring,
+149 ENDOFty_log.
+150 " endofchangesfornewtemplatebyHemangJoshi
+151
+152
+153 TYPES:BEGINOFty_file_extend,
+154 bpartnerTYPE bu_partner,
+155 ***COMPANYCODEDATA
+156 bukrs TYPElfb1-bukrs,
+157 akont TYPEakont,"RECONACCOUNT
+158 zuawa TYPEdzuawa,"SORTKEY
+159 mindk TYPEmindk,
+160 cerdt TYPEchar10,"CERDT,
+161 zterm TYPEdzterm,
+162 reprf TYPEreprf,
+163 ***PRCHASEORAGANISATION****
+164 ekorg TYPEekorg,
+165 waers TYPEwaers,
+166 verkf TYPEverkf,
+167 telf1 TYPEtelf1,
+168 ekgrp TYPEekgrp,
+169 kalsk TYPEkalsk,
+170 ENDOFty_file_extend.
+171
+172 TYPES:BEGINOFty_file_vendor,
+173 lifnrTYPElifnr,
+174 ENDOFty_file_vendor.
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 46
+175
+176 TYPES:BEGINOFty_lfa1,
+177 lifnrTYPElfa1-lifnr,
+178 ktokkTYPElfa1-ktokk,
+179 ENDOFty_lfa1.
+180
+181 TYPES:BEGINOFty_upload,
+182 client TYPEmandt,"CLNT 30CLIENT
+183 partner TYPEbu_partner,"CHAR 10 0BUSINESSPARTNERNUMBER
+184 taxtype TYPEbptaxtype, "CHAR40TAXNUMBERCATEGORY
+185 taxnum TYPEbptaxnum,"CHAR 20 0BUSINESSPARTNERTAXNUMB
+ER
+186 taxnumxlTYPEbptaxnumxl," CHAR 60 0BUSINESSPARTNERTAXN
+UMBER
+187 ENDOFty_upload.
+188
+189 TYPES:BEGINOFty_msg,
+190 partnerTYPEbu_partner,
+191 name TYPElfa1-name1,
+192 reason TYPEstring,
+193 ENDOFty_msg.
+194
+195 TYPES:BEGINOFty_log_ex.
+196 INCLUDETYPEty_file_extend.
+197 TYPES: msgty TYPEbapi_mtype,
+198 messageTYPEstring,
+199 ENDOFty_log_ex.
+200 *& *
+201 *& INTERNALTABLE&WORKAREADECLARATION
+202 *& *
+203 DATA:gt_raw TYPEsolix_tab,
+204 gv_bin_lenTYPEi.
+205 DATA:it_file TYPETABLEOFty_file_bp,
+206 it_file_all TYPETABLEOFty_file_bp,
+207 wa_file TYPEty_file_bp,
+208 t_error TYPETABLEOFty_file_bp,
+209 t_log TYPETABLEOFty_log,"TY_LOG,
+210 w_log TYPEty_log,"TY_LOG.
+211 t_log_ex TYPETABLEOFty_log_ex,
+212 w_log_ex TYPEty_log_ex,
+213 t_msg TYPESTANDARDTABLEOFty_msg,
+214 w_msg TYPEty_msg,
+215 t_filev TYPETABLEOFty_file_vendor,
+216 w_filev TYPEty_file_vendor,
+217 wa TYPEty_file_vendor,
+218 t_lfa1 TYPESTANDARDTABLEOFty_lfa1,
+219 w_lfa1 TYPEty_lfa1,
+220 it_raw TYPEtruxs_t_text_data,
+221 wa_bnka TYPEbnka,
+222 wa_final_2 TYPEty_upload,
+223 wa_final_3 TYPElfb1,
+224 wa_final_5 TYPElfm1,
+225 "AddedbykedarSubratOn25.09.2019forextendCCdata&Pur.Or
+g.Data
+226 it_file_extendTYPESTANDARDTABLEOFty_file_extend,
+227 wa_file_extendTYPEty_file_extend.
+228 "EndedbykedarSubratOn25.09.2019forextendCCdata&Pur.Org.Dat
+a
+229 *& *
+230 *& LOCALANDGLOBALVAIABLEDECLARATION
+231 *& *
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 47
+232 DATA:lv_flag,
+233 lv_vendorTYPElfa1-lifnr,
+234 lv_lengthTYPEi. "Yashveer19.10.2019
+235 * LE_DATA TYPEREFTOLCL_DATA_1.
+236 *& *
+237 *& LOCALANDGLOBALVAIABLEFORIDNUMBERDECLARATION
+238 *& *
+239 DATA:lv_id_from_date TYPEstring,"BU_ID_VALID_DATE_FROM,
+240 lv_id_to_date TYPEstring,"BU_ID_VALID_DATE_TO,
+241 lv1_id_from_date TYPEstring,
+242 lv2_id_from_date TYPEstring,
+243 lv1_id_to_date TYPEstring,
+244 lv2_id_to_date TYPEstring,
+245 lv1_identificationcategoryTYPEbapibus1006_identification_key-id
+entificationcategory,
+246 lv2_identificationcategoryTYPEstring,
+247 lv1_identificationnumber TYPEbapibus1006_identification_key-id
+entificationnumber,
+248 lv2_identificationnumber TYPEstring.
+249 *& *
+250 *& BPRELATEDDATADECLARATION
+251 *& *
+252 DATA:iv_partner TYPEbu_partner,
+253 wa_but000 TYPEbut000,
+254 wa_lfa1 TYPElfa1,
+255 partner_change TYPEflag,
+256 businesspartnerextern TYPEbapibus1006_head-bpartner,
+257 partnercategory TYPEbapibus1006_head-partn_cat,
+258 partnergroup TYPEbapibus1006_head-partn_grp,
+259 centraldata TYPEbapibus1006_central,
+260 centraldatax TYPEbapibus1006_central_x,
+261 central_group TYPEbapibus1006_central_group,
+262 central_groupx TYPEbapibus1006_central_group_x,
+263 centraldataperson TYPEbapibus1006_central_person,
+264 centraldatapersonx TYPEbapibus1006_central_person_x,
+265 centraldataorganization TYPEbapibus1006_central_organ,
+266 centraldataorganizationx TYPEbapibus1006_central_organ_x,
+267 centraldatagroup TYPEbapibus1006_central_group,
+268 addressdata TYPEbapibus1006_address,
+269 industries TYPEbapibus1006_industrysector,
+270 businesspartner TYPEbapibus1006_head-bpartner,
+271 it_telephondata TYPESTANDARDTABLEOFbapiadtel,
+272 wa_telephondata TYPEbapiadtel,
+273 it_maildata TYPESTANDARDTABLEOFbapiadsmtp,
+274 wa_maildata TYPEbapiadsmtp,
+275 industrysector LIKEbapibus1006_industrysector-indust
+rysector,
+276 identification LIKEbapibus1006_identification,
+277 defaultindustry LIKEbapibus1006_industrysector-defaul
+tindustrysector,
+278 defaultindustry_x LIKEbapibus1006_industrysector_x,
+279 industrysectorkeysystem LIKEbapibus1006_industrysector-indust
+rysectorkeysystem,
+280 industrysectordetail TYPESTANDARDTABLEOFbapibus1006_ind
+ustrysector,
+281 l_partner TYPEbapibus1006_head-bpartner,
+282 it_faxdata TYPESTANDARDTABLEOFbapiadfax,
+283 wa_faxdata TYPEbapiadfax,
+284 return TYPESTANDARDTABLEOFbapiret2,
+285 x_save_add TYPEbapi4001_1,
+286 chk_address TYPEbapibus1006_address,
+21.07.26DEV IncludeZMM_VEND_MASTER_TOP Page 48
+287 businesspartnerrolecategoryTYPEbapibus1006_bproles-partnerroleca
+tegory,
+288 all_businesspartnerroles TYPEbapibus1006_x-mark,
+289 businesspartnerrole TYPEbapibus1006_bproles-partnerrole,
+290 differentiationtypevalue TYPEbapibus1006_bproles-difftypevalue
+,
+291 validfromdate TYPEbapibus1006_bprole_validity-bprol
+evalidfrom,
+292 validuntildate TYPEbapibus1006_bprole_validity-bprol
+evalidto.
+293 *& *
+294 *& CompanyCodeExtendRelated DATADECLARATION
+295 *& *
+296 DATA:lt_vendors TYPEvmds_ei_extern_t,
+297 ls_vendors TYPEvmds_ei_extern,
+298 ls_central TYPEvmds_ei_vmd_central,
+299 lt_company TYPEvmds_ei_company_t,
+300 ls_company TYPEvmds_ei_company,
+301 ls_company_data TYPEvmds_ei_vmd_company,
+302 is_master_data TYPEvmds_ei_main,
+303 ls_address TYPEcvis_ei_address1,
+304 es_master_data_correct TYPEvmds_ei_main,
+305 es_message_correct TYPEcvis_message,
+306 es_master_data_defectiveTYPEvmds_ei_main,
+307 es_message_defective TYPEcvis_message.
+308 *& *
+309 *& PurchasingDataExtendRelated DATADECLARATION
+310 *& *
+311 DATA:lt_purchasing TYPEvmds_ei_purchasing_t,
+312 ls_purchasing TYPEvmds_ei_purchasing,
+313 lt_purch_func TYPEvmds_ei_functions_t,
+314 ls_purch_func TYPEvmds_ei_functions,
+315 ls_purch_fun_dataTYPEvmds_ei_vmd_functions,
+316 ls_purchas_data TYPEvmds_ei_vmd_purchasing,
+317 iv_ktokd TYPEktokd,
+318 et_parvw TYPEcmds_parvw_t.
+319 DATA:gs_vmds_extern TYPEvmds_ei_main,
+320 gs_succ_messagesTYPEcvis_message,
+321 gs_vmds_error TYPEvmds_ei_main,
+322 gs_err_messages TYPEcvis_message,
+323 gs_vmds_succ TYPEvmds_ei_main,
+324 gv_ktokk TYPEktokk,
+325 gv_ccode TYPEbukrs,
+326 gv_akont TYPEakont,
+327 gv_name TYPEname1.
+328 *& *
+329 *& ALVRELATEDDATADECLARATION
+330 *& *
+331 DATA:t_fcat TYPEslis_t_fieldcat_alv,
+332 w_fcat TYPEslis_fieldcat_alv,
+333 s_layoutTYPEslis_layout_alv.
+21.07.26
+DEV
+Include ZMM_VEND_MASTER_SCR
+Page
+49
+1 *&
+2 *& Include
+3 *&
+ZMM_VEND_MASTER_SCR
+*
+*
+4 *&
+*
+5 *&
+6 *&
+SELECTION SCREEN
+*
+7 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-101.
+8
+SELECTION-SCREEN BEGIN OF LINE.
+9
+10
+11
+12
+13
+14
+15
+PARAMETERS : rb_new RADIOBUTTON GROUP r1 USER-COMMAND uc1 DEFAULT 'X
+'.
+SELECTION-SCREEN COMMENT 4(20) TEXT-001 FOR FIELD rb_new.
+PARAMETERS : rb_chg RADIOBUTTON GROUP r1.
+SELECTION-SCREEN COMMENT (40) TEXT-003 FOR FIELD rb_chg.
+PARAMETERS : rb_ext RADIOBUTTON GROUP r1.
+SELECTION-SCREEN COMMENT (60) TEXT-002 FOR FIELD rb_ext.
+SELECTION-SCREEN END OF LINE.
+16 SELECTION-SCREEN END OF BLOCK b1.
+17 SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-102.
+18
+PARAMETERS: p_flname TYPE localfile.
+19 SELECTION-SCREEN END OF BLOCK b2.
+20 SELECTION-SCREEN: BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-103.
+21
+" Defining the button on the selection screen
+22
+SELECTION-SCREEN PUSHBUTTON /2(25) btn_tpl USER-COMMAND dtl.
+23 SELECTION-SCREEN: END OF BLOCK b3.
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 50
+1 *& *
+2 *&Include ZMM_VEND_MASTER_CL
+3 *& *
+4 *& *
+5 *& CLASSDECLARATION
+6 *& *
+7 CLASSlcl_dataDEFINITION.
+8 PUBLICSECTION.
+9 METHODS:create_vendor_data.
+10
+11 PRIVATESECTION.
+12 METHODS:prepare_data
+13 RETURNINGVALUE(re_flag)TYPEi.
+14 * DATADECLARATIONS
+15 DATA:gs_vmds_extern TYPEvmds_ei_main,
+16 gs_succ_messagesTYPEcvis_message,
+17 gs_vmds_error TYPEvmds_ei_main,
+18 gs_err_messages TYPEcvis_message,
+19 gs_vmds_succ TYPEvmds_ei_main,
+20 gv_ktokk TYPEktokk,
+21 gv_ccode TYPEbukrs,
+22 gv_akont TYPEakont,
+23 gv_name TYPEname1.
+24 ENDCLASS. "LCL_DATA
+25 * *
+26 * CLASSLCL_DATAIMPLEMENTATION
+27 * *
+28 CLASSlcl_dataIMPLEMENTATION.
+29 *& *
+30 *& METHODTOCREATEVENDORDATA
+31 *& *
+32 METHODcreate_vendor_data.
+33 * LOCALDATADECLARATION
+34 DATA:lv_returnTYPEi.
+35 * PREPARETHEDATATOBEUSEDFORVENDORCREATION
+36 lv_return= me->prepare_data().
+37 * DONOTPROCEEDIFTHEVENDORDATAFORCREATIONWASNOTPREPARED
+38 IFlv_returnISNOTINITIAL.
+39 EXIT.
+40 ENDIF.
+41 * INITIALIZEALLTHEDATA
+42 vmd_ei_api=>initialize().
+43 * CALLTHEMETHODFORCREATIONOFVENDOR.
+44 CALLMETHODvmd_ei_api=>maintain_bapi
+45 EXPORTING
+46 is_master_data =gs_vmds_extern
+47 IMPORTING
+48 es_master_data_correct =gs_vmds_succ
+49 es_message_correct =gs_succ_messages
+50 es_master_data_defective=gs_vmds_error
+51 es_message_defective =gs_err_messages.
+52
+53 IFgs_err_messages-is_errorISINITIAL.
+54 COMMITWORKANDWAIT.
+55 ELSE.
+56 w_log-message= {w_log-message}VendorBAPIFailed:.
+57 LOOPATgs_err_messages-messagesINTODATA(wa_err).
+58 w_log-message= {w_log-message}{wa_err-message};.
+59 ENDLOOP.
+60 ENDIF.
+61 ENDMETHOD. "CREATE_VENDOR_DATA
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 51
+62 *& *
+63 *& METHODTOPREPAREDATAFORVENDORCREATION
+64 *& *
+65 METHODprepare_data.
+66 DATA:lt_contacts TYPEvmds_ei_contacts_t,
+67 ls_contacts TYPEvmds_ei_contacts,
+68 lt_vendors TYPEvmds_ei_extern_t,
+69 ls_vendors TYPEvmds_ei_extern,
+70 ls_address TYPEcvis_ei_address1,
+71 ls_addressdep TYPEvmds_ei_central_addr,
+72 lt_company TYPEvmds_ei_company_t,
+73 ls_company TYPEvmds_ei_company,
+74 whtax_t TYPEvmds_ei_wtax_type_t,
+75 whtax_s TYPEvmds_ei_wtax_type,
+76 ls_company_data TYPEvmds_ei_vmd_company,
+77 ls_purchas_data TYPEvmds_ei_vmd_purchasing,
+78 lt_purchasing TYPEvmds_ei_purchasing_t,
+79 lt_purchasing2 TYPEvmds_ei_purchasing2_t,
+80 ls_purchasing TYPEvmds_ei_purchasing,
+81 ls_purchasing2 TYPEvmds_ei_purchasing2_s,
+82 lt_purch_func TYPEvmds_ei_functions_t,
+83 ls_purch_func TYPEvmds_ei_functions,
+84 ls_purch_fun_dataTYPEvmds_ei_vmd_functions,
+85 ls_message TYPEcvis_message,
+86 lv_contactid TYPEbapicontact_01-contact,
+87 l_ktokk TYPEktokk,
+88 ls_lfa1 TYPEvmds_lfa1_s.
+89
+90 DATA:lv_date_frmc TYPEdats,
+91 lv_date_toc TYPEdats,
+92 lv_file_frm_dateTYPEstring,
+93 lv_file_to_date TYPEstring.
+94
+95 DATA:iv_ktokdTYPEktokd,
+96 et_parvwTYPEcmds_parvw_t.
+97
+98 DATA:lv_date_con TYPEdats,
+99 lv_file_dateTYPEstring.
+100
+101 wa_file-bpartner= {wa_file-bpartnerALPHA=IN}.
+102
+103 CLEAR:gs_vmds_extern.
+104
+105 ls_vendors-header-object_instance-lifnr= {lfa1-lifnrALPHA=IN}
+.
+106 ls_vendors-header-object_task='U'.
+107
+108 ls_addressdep-data-bahns=wa_file-bahns.
+109 ls_addressdep-datax-bahns=abap_true.
+110 APPENDls_addressdepTOls_vendors-central_data-central-central_addr
+essdep-addressdep.
+111
+112 ls_vendors-central_data-central=VALUE#(
+113 data=VALUE#(
+114 stenr =wa_file-stenr
+115 profs =wa_file-profs
+116 bahns =wa_file-bahns
+117 j_1kftind=wa_file-j_1kftind
+118 j_1kftbus=wa_file-j_1kftbus
+119 )
+120 datax=VALUE#(
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 52
+121 stenr ='X'
+122 profs ='X'
+123 bahns ='X'
+124 j_1kftind='X'
+125 j_1kftbus='X'
+126 )
+127 ).
+128
+129 ls_vendors-central_data-address=VALUE#(
+130 task='U'
+131 postal=VALUE#(
+132 data=VALUE#(
+133 name =lfa1-name1
+134 country=lfa1-land1
+135 )
+136 datax=VALUE#(
+137 name ='X'
+138 country='X'
+139 )
+140 )
+141 ).
+142 *& *
+143 *& * SETTHECOMPANYCODEANDGLACCOUNT
+144 *& *
+145 IFwa_file-bukrsISNOTINITIAL.
+146 CLEARw_lfa1.
+147
+148 READTABLEt_lfa1INTOw_lfa1WITHKEYlifnr=lfa1-lifnr.
+149 IFsy-subrc=0.
+150 l_ktokk=w_lfa1-ktokk.
+151 ENDIF.
+152
+153 ls_company=VALUE#(
+154 task ='M'
+155 data_key =VALUE#(bukrs=wa_file-bukrs)
+156 data =VALUE#(
+157 akont = {wa_file-akontALPHA=IN} "InlineAlphaConve
+rsion
+158 zuawa =wa_file-zuawa
+159 altkn =wa_file-altkn
+160 "Dateconversionusingfunctionalstyle/stringtemplates
+161 cerdt =COND#(WHENwa_file-cerdtISNOTINITIALTHEN {w
+a_file-cerdt+6(4)}{wa_file-cerdt+3(2)}{wa_file-cerdt+0(2)} ELSE''
+)
+162 reprf =wa_file-reprf
+163 zterm =wa_file-zterm
+164 kverm =wa_file-kverm
+165 hbkid =wa_file-hbkid
+166 mindk =wa_file-mindk
+167 zwels =wa_file-paymethod
+168 )
+169 datax =VALUE#(
+170 zterm ='X'akont='X'zuawa='X'altkn='X'
+171 reprf ='X'kverm='X'hbkid='X'mindk='X'
+172 zwels ='X'
+173 )
+174 ).
+175 IFwa_file-srnoISNOTINITIAL.
+176 LOOPATit_file_allINTODATA(wa_file_all)WHEREsrno=wa_file
+srno.
+177 whtax_s-task ='M'.
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 53
+178 whtax_s-data_key-witht =wa_file_all-witht.
+179 whtax_s-data-wt_withcd =wa_file_all-wt_withcd.
+180 whtax_s-data-wt_subjct =wa_file_all-wt_subjct.
+181 whtax_s-data-wt_wtstcd =wa_file_all-wt_wtstcd.
+182 whtax_s-data-wt_exnr =wa_file_all-wt_exnr .
+183 whtax_s-data-wt_exrt =wa_file_all-wt_exrt.
+184
+185 IFwa_file_all-wt_exdfISNOTINITIAL.
+186 lv_file_frm_date=wa_file_all-wt_exdf.
+187 lv_date_frmc=lv_file_frm_date+6(4)&&lv_file_frm_date+3(2
+)&&lv_file_frm_date+0(2).
+188 ENDIF.
+189 IFwa_file_all-wt_exdtISNOTINITIAL.
+190 lv_file_to_date=wa_file_all-wt_exdt.
+191 lv_date_toc=lv_file_to_date+6(4)&&lv_file_to_date+3(2)&
+&lv_file_to_date+0(2).
+192 ENDIF.
+193
+194 whtax_s-data-wt_exdf =lv_date_frmc.
+195 whtax_s-data-wt_exdt =lv_date_toc.
+196 whtax_s-data-wt_wtexrs =wa_file_all-wt_wtexrs.
+197 whtax_s-data-qsrec =wa_file_all-qsrec.
+198
+199 whtax_s-datax-wt_withcd =abap_true.
+200 whtax_s-datax-wt_subjct =abap_true.
+201 whtax_s-datax-wt_wtstcd =abap_true.
+202 whtax_s-datax-wt_exnr =abap_true.
+203 whtax_s-datax-wt_exrt =abap_true.
+204 whtax_s-datax-wt_exdf =abap_true.
+205 whtax_s-datax-wt_exdt =abap_true.
+206 whtax_s-datax-wt_wtexrs =abap_true.
+207 whtax_s-datax-qsrec =abap_true.
+208
+209 APPENDwhtax_sTOwhtax_t.
+210 CLEAR:whtax_s,wa_file_all.
+211 ENDLOOP.
+212
+213 ls_company-wtax_type-wtax_type=whtax_t.
+214 ENDIF.
+215
+216 APPENDls_companyTOls_vendors-company_data-company.
+217 ENDIF.
+218 *& *
+219 *& * SETTHEPURCHASINGDATA
+220 *& *
+221 IFwa_file-ekorgISNOTINITIAL.
+222 vmd_ei_api_check=>get_mand_partner_functions(
+223 EXPORTINGiv_ktokk=w_lfa1-ktokk
+224 IMPORTINGet_parvw=et_parvw
+225 ).
+226
+227 DATA:lt_existing_wyt3TYPETABLEOFwyt3.
+228 SELECT*FROMwyt3
+229 INTOTABLElt_existing_wyt3
+230 WHERElifnr=w_lfa1-lifnr
+231 ANDekorg=wa_file-ekorg.
+232
+233 ls_purchasing=VALUE#(
+234 task ='M'
+235 data_key=VALUE#(ekorg=wa_file-ekorg)
+236 data =VALUE#(
+21.07.26DEV IncludeZMM_VEND_MASTER_CL Page 54
+237 waers =wa_file-waers
+238 zterm =wa_file-zterm_org
+239 verkf =wa_file-verkf
+240 telf1 =wa_file-telf1
+241 ekgrp =wa_file-ekgrp
+242 kalsk =wa_file-kalsk
+243 lebre =wa_file-lebre
+244 kzaut =wa_file-kzaut
+245 inco1 =wa_file-inco1
+246 inco2_l=wa_file-inco1_l
+247 inco2 =wa_file-inco2
+248 inco3_l=wa_file-inco2_l
+249 webre =wa_file-webre
+250 lfabc =wa_file-lfabc
+251 )
+252 datax =VALUE#(
+253 waers='X'zterm='X'verkf='X'telf1='X'ekgrp='X'
+254 kalsk='X'lebre='X'kzaut='X'inco1='X'inco2_l='X'
+255 inco2='X'inco3_l='X'webre='X'
+256 )
+257 ).
+258
+259 ls_purchasing-functions-functions=VALUE#(FORwaINet_parvw(
+260 task =COND#(WHENline_exists(lt_existing_wyt3[parvw=
+wa-parvw])
+261 THEN'U'
+262 ELSE'I')
+263 data_key=VALUE#(parvw=wa-parvw)
+264 data =VALUE#(partner=w_lfa1-lifnr)
+265 datax =VALUE#(partner='X')
+266 )).
+267
+268 APPENDls_purchasingTOls_vendors-purchasing_data-purchasing.
+269 ENDIF.
+270
+271 APPENDls_vendorsTOgs_vmds_extern-vendors.
+272
+273 MOVEwa_file-bpartnerTOiv_partner.
+274 IFrb_new='X'ANDwa_file-banklISNOTINITIAL.
+275 PERFORMupload_bank_to_bp.
+276 ENDIF.
+277 ENDMETHOD. "PREPARE_DATA
+278 ENDCLASS. "LCL_DATAIMPLEMENTATION
+279
+280 DATA:lo_dataTYPEREFTOlcl_data.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 55
+1 *& *
+2 *&Include ZMM_VEND_MASTER_FORMS
+3 *& *
+4 FORMdownload_template.
+5 DATA:lv_filename TYPEstring,
+6 lt_file_dataTYPETABLEOFstring,
+7 lv_header TYPEstring,
+8 lv_fname TYPEstring,
+9 lv_path TYPEstring,
+10 lv_fpath TYPEstring,
+11 lv_action TYPEi.
+12
+13 "Addyourspecificfieldlisthere
+14 DATA(lv_tab)=cl_abap_char_utilities=>horizontal_tab.
+15
+16 IFrb_new='X'.
+17 lv_header= BusinessPartnerNumber{lv_tab}PartnerType{lv_tab}
+BPGrouping{lv_tab}Title{lv_tab} &&
+18 Name1{lv_tab}Name2{lv_tab}Name3{lv_tab}Name4{
+lv_tab} &&
+19 OldVendorCode{lv_tab}SearchTerm1{lv_tab}Search
+Term2{lv_tab}BUILDING{lv_tab} &&
+20 ROOMNUMBER{lv_tab}FLOOR{lv_tab}STREET{lv_tab}STRE
+ET1{lv_tab} &&
+21 STREET2{lv_tab}STREET3{lv_tab}LOCATION{lv_tab}DIS
+TRICT{lv_tab} &&
+22 HOMECITY{lv_tab}PostalCode{lv_tab}City{lv_tab}C
+ountry{lv_tab} &&
+23 Region(General){lv_tab}Telephonenumber{lv_tab}Mob
+ilenumber{lv_tab}FaxNumber{lv_tab} &&
+24 Email0{lv_tab}ValidFrom{lv_tab}ValidTo{lv_tab}
+PartnerType{lv_tab} &&
+25 IdentificationCategory{lv_tab}IdentificationNumber{
+lv_tab}IDFromDate{lv_tab}IDToDate{lv_tab} &&
+26 Telephoneno.3{lv_tab}Email1{lv_tab}Email2{lv_t
+ab}Email3{lv_tab} &&
+27 Email4{lv_tab}Email5{lv_tab}Email6{lv_tab}J1I
+Excise-Dep{lv_tab}J1IExcise-Range{lv_tab}J1IExcise-Division{
+lv_tab} &&
+28 J1IExcise-District{lv_tab}J1IExcise-Commissione
+rate{lv_tab}J1IVendorType{lv_tab}CustomerNumber{lv_tab} &&
+29 PAN{lv_tab}ServiceTaxRegistration{lv_tab}BPTaxN
+umberCategory{lv_tab}GSTNo.{lv_tab} &&
+30 VendorClass{lv_tab}IndustrySector{lv_tab}TimeZon
+e{lv_tab}CompanyCode{lv_tab} &&
+31 ReconAccount{lv_tab}SortKey{lv_tab}PreviousAccou
+ntNumber{lv_tab}MinorityIndicator{lv_tab} &&
+32 CertificationDate{lv_tab}PaymentTerms{lv_tab}Doub
+leInvoiceCheck{lv_tab}AccountMemo/CheckFlag{lv_tab} &&
+33 NEW:HouseBankID{lv_tab}PurchasingOrganization{lv
+_tab}Currency{lv_tab}PaymentTerms(Purchasing){lv_tab} &&
+34 ResponsibleSalesperson{lv_tab}IncotermsPart1{lv_t
+ab}IncotermsLocation1{lv_tab}IncotermsPart2{lv_tab} &&
+35 IncotermsLocation2{lv_tab}GR-basedIV{lv_tab}Serv
+ice-basedIV{lv_tab}AutomaticPOAllowed{lv_tab} &&
+36 ABCIndicator{lv_tab}TANNumber{lv_tab}MSMENumber{
+lv_tab}TypeofIndustry{lv_tab} &&
+37 TypeofBusiness{lv_tab}TrainStation(CIN){lv_tab}
+SupplierTelephoneNo.{lv_tab}PurchasingGroup{lv_tab} &&
+38 SchemaGroup{lv_tab}PartnerFunction(Purchasingover
+ride){lv_tab}BankCountry/RegionKey{lv_tab}BPBankID{lv_tab} &&
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 56
+39 BankKey{lv_tab}BankAccountNumber{lv_tab}Remainin
+gBankAccountNo.{lv_tab}AccountHolderName{lv_tab} &&
+40 User-definedBankAccountName{lv_tab}NameofFinanci
+alInstitution{lv_tab}BankRegion{lv_tab}BankStreet{lv_tab} &&
+41 BankCity{lv_tab}Branch{lv_tab}SwiftCode{lv_tab}
+Reason{lv_tab} &&
+42 VendorNumber{lv_tab}Flag{lv_tab}WHTSRNO(groupke
+y){lv_tab}WithholdingTaxType{lv_tab} &&
+43 SubjecttoWHT{lv_tab}TypeofRecipient{lv_tab}WHT
+IdentificationNumber{lv_tab}WHTCode{lv_tab} &&
+44 ExemptionCertificateNumber{lv_tab}ExemptionRate{l
+v_tab}ExemptionFromDate{lv_tab}ExemptionToDate{lv_tab} &&
+45 ReasonforExemption{lv_tab}PaymentMethod{lv_tab}C
+ontrolKey.
+46 ELSEIFrb_ext='X'ORrb_chg='X'.
+47 lv_header= BusinessPartnerNumber{lv_tab}CompanyCode{lv_tab}
+ReconAccount{lv_tab} &&
+48 SortKey{lv_tab}MinorityIndicator{lv_tab}Certifica
+tionDate{lv_tab} &&
+49 PaymentTerms{lv_tab}DoubleInvoiceCheck{lv_tab}Pu
+rchasingOrg{lv_tab} &&
+50 Currency{lv_tab}ResponsibleSalesperson{lv_tab}Vend
+orTel{lv_tab} &&
+51 PurchasingGroup{lv_tab}SchemaGroup .
+52 ENDIF.
+53 APPENDlv_headerTOlt_file_data.
+54
+55
+56 "OpenSaveDialog
+57 lv_filename= BP_Vend_Template_{sy-datum}_{sy-uzeit}.
+58
+59 CALLMETHODcl_gui_frontend_services=>file_save_dialog
+60 EXPORTING
+61 window_title ='SaveTemplateAs'
+62 default_extension='XLS'
+63 default_file_name=lv_filename
+64 initial_directory='C:\'
+65 CHANGING
+66 filename =lv_filename
+67 path =lv_path
+68 fullpath =lv_fpath
+69 user_action =lv_action.
+70
+71 CHECKlv_action=cl_gui_frontend_services=>action_ok.
+72
+73 "DownloadHeaderonly(emptydatatable)
+74 CALLFUNCTION'GUI_DOWNLOAD'
+75 EXPORTING
+76 filename =lv_fpath
+77 filetype ='DAT'
+78 write_field_separator='X'"EnsuresExcelcolumnsalign
+79 TABLES
+80 data_tab =lt_file_data.
+81 ENDFORM.
+82 *& *
+83 *&FormVALUE_REQUEST
+84 *& *
+85 *&text
+86 *& *
+87 *& > p1 text
+88 *&< p2 text
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 57
+89 *& *
+90 FORMvalue_request.
+91 CALLFUNCTION'F4_FILENAME'
+92 EXPORTING
+93 program_name=sy-cprog
+94 IMPORTING
+95 file_name =p_flname.
+96 ENDFORM.
+97 *& *
+98 *&FormUPLOAD_EXCEL
+99 *& *
+100 *&text
+101 *& *
+102 *& > p1 text
+103 *&< p2 text
+104 *& *
+105 FORMupload_excel.
+106 DATA:lv_fname TYPEstring.
+107
+108 lv_fname=p_flname.
+109
+110 CALLFUNCTION'GUI_UPLOAD'
+111 EXPORTING
+112 filename =lv_fname
+113 filetype ='BIN'
+114 IMPORTING
+115 filelength =gv_bin_len
+116 TABLES
+117 data_tab =gt_raw
+118 EXCEPTIONS
+119 file_open_error =1
+120 file_read_error =2
+121 no_batch =3
+122 gui_refuse_filetransfer=4
+123 invalid_type =5
+124 no_authority =6
+125 unknown_error =7
+126 bad_data_format =8
+127 header_not_allowed =9
+128 separator_not_allowed =10
+129 header_too_long =11
+130 unknown_dp_error =12
+131 access_denied =13
+132 dp_out_of_memory =14
+133 disk_full =15
+134 dp_timeout =16
+135 OTHERS =17.
+136 ENDFORM.
+137 *& *
+138 *&Formconvert_data_cr
+139 *& *
+140 *&text
+141 *& *
+142 *& > p1 text
+143 *&< p2 text
+144 *& *
+145 FORMconvert_data_cr.
+146 DATA:lv_xstring TYPExstring,
+147 lo_excel TYPEREFTOcl_fdt_xl_spreadsheet,
+148 lv_docname TYPEstring,
+149 lt_worksheetsTYPESTANDARDTABLEOFstring,
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 58
+150 lv_worksheet TYPEstring,
+151 lv_lines TYPEi,
+152 lo_data TYPEREFTOdata.
+153
+154 FIELD-SYMBOLS:<lt_data_bin> TYPESTANDARDTABLE,
+155 <ls_data_bin> TYPEany,
+156 <lv_value_bin>TYPEany,
+157 <lv_value> TYPEany.
+158
+159 CALLFUNCTION'SCMS_BINARY_TO_XSTRING'
+160 EXPORTING
+161 input_length=gv_bin_len
+162 IMPORTING
+163 buffer =lv_xstring
+164 TABLES
+165 binary_tab =gt_raw
+166 EXCEPTIONS
+167 failed =1
+168 OTHERS =2.
+169
+170 CREATEOBJECTlo_excel
+171 EXPORTING
+172 document_name=lv_docname
+173 xdocument =lv_xstring.
+174
+175 IFlo_excelISNOTINITIAL.
+176 lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+177 IMPORTING
+178 worksheet_names=lt_worksheets).
+179 ENDIF.
+180
+181 DESCRIBETABLElt_worksheetsLINESlv_lines.
+182
+183 IFlt_worksheets[]ISNOTINITIAL.
+184 READTABLElt_worksheetsINTOlv_worksheetINDEXlv_lines.
+185 lo_data=lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+lv_worksheet).
+186 ASSIGNlo_data->*TO<lt_data_bin>.
+187 ENDIF.
+188
+189 IF<lt_data_bin>ISASSIGNED.
+190 LOOPAT<lt_data_bin>ASSIGNING<ls_data_bin>FROM2.
+191 CLEAR:wa_file.
+192 DO.
+193 ASSIGNCOMPONENTsy-indexOFSTRUCTURE<ls_data_bin>TO<lv_valu
+e_bin>.
+194 IFsy-subrcEQ0.
+195 ASSIGNCOMPONENTsy-indexOFSTRUCTUREwa_fileTO<lv_value>.
+196 IFsy-subrcEQ0.
+197 <lv_value>=<lv_value_bin>.
+198 ENDIF.
+199 ELSE.
+200 EXIT.
+201 ENDIF.
+202 ENDDO.
+203 IFwa_fileISNOTINITIAL.
+204 APPENDwa_fileTOit_file.
+205 ENDIF.
+206 ENDLOOP.
+207 ENDIF.
+208 ENDFORM.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 59
+209 *& *
+210 *&Formconvert_data_ex
+211 *& *
+212 *&text
+213 *& *
+214 *& > p1 text
+215 *&< p2 text
+216 *& *
+217 FORMconvert_data_ex.
+218 DATA:lv_xstring TYPExstring,
+219 lo_excel TYPEREFTOcl_fdt_xl_spreadsheet,
+220 lv_docname TYPEstring,
+221 lt_worksheetsTYPESTANDARDTABLEOFstring,
+222 lv_worksheet TYPEstring,
+223 lv_lines TYPEi,
+224 lo_data TYPEREFTOdata.
+225
+226 FIELD-SYMBOLS:<lt_data_bin> TYPESTANDARDTABLE,
+227 <ls_data_bin> TYPEany,
+228 <lv_value_bin>TYPEany,
+229 <lv_value> TYPEany.
+230
+231 CALLFUNCTION'SCMS_BINARY_TO_XSTRING'
+232 EXPORTING
+233 input_length=gv_bin_len
+234 IMPORTING
+235 buffer =lv_xstring
+236 TABLES
+237 binary_tab =gt_raw
+238 EXCEPTIONS
+239 failed =1
+240 OTHERS =2.
+241
+242 CREATEOBJECTlo_excel
+243 EXPORTING
+244 document_name=lv_docname
+245 xdocument =lv_xstring.
+246
+247 IFlo_excelISNOTINITIAL.
+248 lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+249 IMPORTING
+250 worksheet_names=lt_worksheets).
+251 ENDIF.
+252
+253 DESCRIBETABLElt_worksheetsLINESlv_lines.
+254
+255 IFlt_worksheets[]ISNOTINITIAL.
+256 READTABLElt_worksheetsINTOlv_worksheetINDEXlv_lines.
+257 lo_data=lo_excel->if_fdt_doc_spreadsheet~get_itab_from_worksheet(
+lv_worksheet).
+258 ASSIGNlo_data->*TO<lt_data_bin>.
+259 ENDIF.
+260
+261 IF<lt_data_bin>ISASSIGNED.
+262 LOOPAT<lt_data_bin>ASSIGNING<ls_data_bin>FROM2.
+263 CLEAR:wa_file_extend.
+264 DO.
+265 ASSIGNCOMPONENTsy-indexOFSTRUCTURE<ls_data_bin>TO<lv_valu
+e_bin>.
+266 IFsy-subrcEQ0.
+267 ASSIGNCOMPONENTsy-indexOFSTRUCTUREwa_file_extendTO<lv_v
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 60
+alue>.
+268 IFsy-subrcEQ0.
+269 <lv_value>=<lv_value_bin>.
+270 ENDIF.
+271 ELSE.
+272 EXIT.
+273 ENDIF.
+274 ENDDO.
+275 IFwa_file_extendISNOTINITIAL.
+276 APPENDwa_file_extendTOit_file_extend.
+277 ENDIF.
+278 ENDLOOP.
+279 ENDIF.
+280 ENDFORM.
+281 *& *
+282 *&FormCREATE_BP_VENDOR
+283 *& *
+284 *&text
+285 *& *
+286 *& > p1 text
+287 *&< p2 text
+288 *& *
+289 FORMcreate_bp_vendor.
+290 it_file_all[]=it_file[].
+291 DELETEit_fileWHEREbukrsISINITIAL.
+292 LOOPATit_fileINTOwa_file.
+293 CLEAR:businesspartnerextern,
+294 partnercategory,
+295 partnergroup,
+296 centraldata,
+297 centraldataperson,
+298 centraldataorganization,
+299 addressdata.
+300 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+301 EXPORTING
+302 input =wa_file-bpartner
+303 IMPORTING
+304 output=wa_file-bpartner.
+305
+306 partnercategory=wa_file-partn_cat.
+307 partnergroup=wa_file-partn_grp.
+308
+309 CLEARbusinesspartnerextern.
+310
+311 "CreateGeneralBP
+312 PERFORMfill_central_data_vendor.
+313 PERFORMfill_address_vendor.
+314
+315
+316 * BeginofchangesbyHemangforBPnotgettingcreatedReqBy:OmPra
+kash
+317 "CheckifBPexists
+318 IFwa_file-bpartnerISNOTINITIAL.
+319 SELECTSINGLEpartnerFROMbut000INTO@DATA(lv_partner)WHEREpar
+tner=@wa_file-bpartner.
+320 IFsy-subrc<>0.
+321 businesspartnerextern=wa_file-bpartner.
+322 ELSE.
+323 partner_change=abap_true.
+324 ENDIF.
+325 ENDIF.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 61
+326 IFlv_partnerISINITIALAND(wa_file-bpartnerISINITIALORwa_fil
+e-bpartnerISNOTINITIAL).
+327 PERFORMcall_bapi_bupa_create.
+328 ELSE.
+329 PERFORMcall_bapi_bupa_central_change.
+330 ENDIF.
+331
+332 * EndofchangesbyHemangforBPnotgettingcreatedReqBy:OmPraka
+sh
+333
+334 IFbusinesspartnerISNOTINITIAL.
+335 "AddVendorRoles(FLVN00forFI,FLVN01forPurchasing)
+336 PERFORMadd_vendor_roles.
+337
+338 SELECTSINGLElink~vendor
+339 FROMbut000ASbp
+340 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+341 WHEREbp~partner=@wa_file-bpartner
+342 INTO@DATA(lv_vend_id).
+343 IFsy-subrc=0.
+344 lv_vendor=lv_vend_id.
+345 w_log-message= {w_log-message}LinkedVendor:{lv_vend_id}
+..
+346 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+347 IFsy-subrc=0.
+348 wa_file-lifnr=lfa1-lifnr.
+349 ENDIF.
+350 SELECTSINGLE*FROMbut020WHEREpartner=wa_file-bpartner.
+351 REFRESH:t_lfa1[].
+352 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=lv_
+vendor.
+353
+354 CREATEOBJECTlo_data.
+355 CALLMETHODlo_data->create_vendor_data.
+356 ENDIF.
+357 SELECTSINGLElink~vendor
+358 FROMbut000ASbp
+359 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+360 WHEREbp~partner=@wa_file-bpartner
+361 INTO@lv_vend_id.
+362 IFlv_vend_idISNOTINITIAL.
+363 IFpartner_changeISINITIAL.
+364 UPDATElfa1SETven_class=wa_file-ven_class
+365 j_1ipanno=wa_file-j_1ipanno
+366 j_1iexcd =wa_file-j_1iexcd
+367 j_1iexrn =wa_file-j_1iexrn
+368 j_1iexrg =wa_file-j_1iexrg
+369 j_1iexdi =wa_file-j_1iexdi
+370 j_1iexco =wa_file-j_1iexco
+371 j_1ivtyp =wa_file-j_1ivtyp
+372 j_1isern =wa_file-j_1isern
+373 j_1kftbus=wa_file-j_1kftbus "JNewlyAdded
+374 j_1kftind=wa_file-j_1kftind "JNewlyAdded
+375 bahns =wa_file-bahns "JNewlyAdded
+376 stenr =wa_file-stenr "JNewlyAdded
+377 profs =wa_file-profs
+378 WHERElifnr=lv_vendor.
+379 COMMITWORKANDWAIT.
+380 w_log-message= {w_log-message}LFA1datamodified. .
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 62
+381 ENDIF.
+382 ENDIF.
+383 ELSE.
+384 w_log-message= {w_log-message}VendorCreationFailed. .
+385 ENDIF.
+386 APPENDw_logTOt_log.
+387 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+388 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+389 CLEAR:lv_vend_id,businesspartner,wa_file,partner_change.
+390 ENDLOOP.
+391 ENDFORM.
+392 FORMfill_central_data_vendor.
+393 centraldata=VALUE#(
+394 searchterm1 =wa_file-searchterm1
+395 searchterm2 =wa_file-searchterm2
+396 title_key =wa_file-title
+397 partnertype =wa_file-partnertype
+398 partnerlanguage ='E'
+399 partnerlanguageiso='EN'
+400 ).
+401
+402 centraldatax=CORRESPONDING#(centraldata).
+403
+404 centraldataperson=COND#(WHENpartnercategory=1
+405 THENVALUE#(firstname=wa_file-name_fir
+st
+406 lastname =wa_file-name_las
+t
+407 birthname=wa_file-name_las
+t2
+408 middlename=wa_file-name_mi
+ddle
+409 correspondlanguage='E'
+410 correspondlanguageiso='EN'
+)).
+411
+412 centraldataorganization=COND#(WHENpartnercategory=2
+413 THENVALUE#(name1=wa_file-name_f
+irst
+414 name2=wa_file-name_l
+ast
+415 name3=wa_file-name_l
+ast2
+416 name4=wa_file-name_m
+iddle)).
+417
+418 centraldatagroup=COND#(WHENpartnercategory=3
+419 THENVALUE#(namegroup1=wa_file-name_fir
+st
+420 namegroup2=wa_file-name_las
+t)).
+421 ENDFORM.
+422 FORMfill_address_vendor.
+423 CLEAR:it_maildata[],it_faxdata[],it_telephondata[].
+424
+425 addressdata=VALUE#(
+426 street =wa_file-street
+427 str_suppl1 =wa_file-str_suppl1
+428 str_suppl2 =wa_file-str_suppl2
+429 str_suppl3 =wa_file-str_suppl3
+430 location =wa_file-location
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 63
+431 building =wa_file-building
+432 room_no =wa_file-roomnumber
+433 floor =wa_file-floor
+434 district =wa_file-district
+435 home_city =wa_file-home_city
+436 postl_cod1 =wa_file-postl_cod1
+437 city =wa_file-city
+438 country =wa_file-country
+439 region =wa_file-region
+440 langu ='E'
+441 languiso ='EN'
+442 time_zone =wa_file-time_zone
+443 validfromdate=COND#(WHENwa_file-valid_fromISNOTINITIAL
+444 THEN {wa_file-valid_from+6(4)}{wa_file-v
+alid_from+3(2)}{wa_file-valid_from+0(2)}
+445 ELSE'')
+446 validtodate =COND#(WHENwa_file-valid_toISNOTINITIAL
+447 THEN {wa_file-valid_to+6(4)}{wa_file-val
+id_to+3(2)}{wa_file-valid_to+0(2)}
+448 ELSE'')
+449 ).
+450
+451 "TelephoneData
+452 it_telephondata=VALUE#(
+453 (country=wa_file-countrytelephone=wa_file-mob_numberstd_no=
+'X'r_3_user='3'consnumber='001'home_flag='X')
+454 (country=wa_file-countrytelephone=wa_file-tel_numberstd_no=
+'X'r_3_user='1'consnumber='002'home_flag='X')
+455 ).
+456
+457 "Ifsecondphoneexists
+458 IFwa_file-tel_number_3ISNOTINITIAL.
+459 it_telephondata=VALUE#(BASEit_telephondata
+460 (country=wa_file-countrytelephone=wa_file-tel_number_3std_n
+o='X'r_3_user='1'consnumber='003'home_flag='X')
+461 ).
+462 ENDIF.
+463
+464 "CompactEmailandFaxassignment
+465 it_faxdata =VALUE#((fax=wa_file-fax)).
+466 it_maildata=VALUE#((e_mail=wa_file-smtp_addrstd_no='X'std_r
+ecip='X'home_flag='X'consnumber='001')).
+467
+468 IFwa_file-email_1ISNOTINITIAL.
+469 it_maildata=VALUE#(BASEit_maildata
+470 (e_mail=wa_file-email_1std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+471 ).
+472 ENDIF.
+473 IFwa_file-email_2ISNOTINITIAL.
+474 it_maildata=VALUE#(BASEit_maildata
+475 (e_mail=wa_file-email_2std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+476 ).
+477 ENDIF.
+478 IFwa_file-email_3ISNOTINITIAL.
+479 it_maildata=VALUE#(BASEit_maildata
+480 (e_mail=wa_file-email_3std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+481 ).
+482 ENDIF.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 64
+483 IFwa_file-email_4ISNOTINITIAL.
+484 it_maildata=VALUE#(BASEit_maildata
+485 (e_mail=wa_file-email_4std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+486 ).
+487 ENDIF.
+488 IFwa_file-email_5ISNOTINITIAL.
+489 it_maildata=VALUE#(BASEit_maildata
+490 (e_mail=wa_file-email_5std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+491 ).
+492 ENDIF.
+493 IFwa_file-email_6ISNOTINITIAL.
+494 it_maildata=VALUE#(BASEit_maildata
+495 (e_mail=wa_file-email_6std_no='X'std_recip='X'home_flag
+='X'consnumber='002')
+496 ).
+497 ENDIF.
+498
+499 ENDFORM.
+500 *& *
+501 *&FormCALL_BAPI_BUPA_CREATE
+502 *& *
+503 *&text
+504 *& *
+505 *& > p1 text
+506 *&< p2 text
+507 *& *
+508 FORMcall_bapi_bupa_create.
+509
+510 CLEARbusinesspartner.
+511 CALLFUNCTION'BAPI_BUPA_CREATE_FROM_DATA'
+512 EXPORTING
+513 businesspartnerextern =businesspartnerextern
+514 partnercategory =partnercategory
+515 partnergroup =partnergroup
+516 centraldata =centraldata
+517 centraldataperson =centraldataperson
+518 centraldataorganization=centraldataorganization
+519 centraldatagroup =centraldatagroup
+520 addressdata =addressdata
+521 IMPORTING
+522 businesspartner =businesspartner
+523 TABLES
+524 telefondata =it_telephondata
+525 faxdata =it_faxdata
+526 e_maildata =it_maildata
+527 **** addressnotes =it_addressnotes
+528 return =return.
+529
+530 w_log=CORRESPONDING#(wa_file).
+531 w_log-bpartner=COND#(WHENbusinesspartnerexternISNOTINITIALTHE
+Nbusinesspartnerextern
+532 WHENbusinesspartnerISNOTINITIALTHENbusi
+nesspartner
+533 ELSEwa_file-bpartner).
+534 IFbusinesspartnerISNOTINITIAL.
+535 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'
+536 EXPORTING
+537 wait='X'.
+538
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 65
+539 WAITUPTO2SECONDS.
+540
+541 IFwa_file-stcd3ISNOTINITIALANDwa_file-taxtypeISNOTINITIAL.
+542 MODIFYdfkkbptaxnumFROM@(VALUE#(
+543 client =sy-mandt
+544 partner =w_log-bpartner
+545 taxtype =wa_file-taxtype
+546 taxnum =wa_file-stcd3
+547 taxnumxl=''
+548 )).
+549
+550 IFsy-subrc=0.
+551 COMMITWORK.
+552 w_log-message='BPVENDORCREATED/UPDATED:TAXUPDATED'.
+553 ELSE.
+554 w_log-message='BPVENDORCREATED/UPDATED:TAXTABLEMODIFYFAI
+LED'.
+555 ENDIF.
+556 ELSE.
+557 w_log-message='BPVENDORCREATED/UPDATED:TAXNUMBERMISSINGIN
+FILE'.
+558 ENDIF.
+559 ENDIF.
+560 IFline_exists(return[type='E']).
+561 w_log-message= {w_log-message}/ERRORS: &&
+562 REDUCEstring(INITm=``
+563 FORwaINreturnWHERE(type='E')
+564 NEXTm=COND#(WHENm=``THENwa-message
+565 ELSE {m};{wa-message} )
+).
+566 ENDIF.
+567
+568 IFbusinesspartnerexternISNOTINITIAL.
+569 businesspartner= businesspartnerextern.
+570 ENDIF.
+571 ENDFORM.
+572 FORMadd_vendor_roles.
+573 DATA:businesspartnerroleTYPEbapibus1006_bproles-partnerrole,
+574 lv_role_status TYPEstring.
+575 "FLVN00:FIVendor(CompanyCodeData)
+576 "FLVN01:Supplier(PurchasingData)
+577
+578 REFRESH:return.
+579
+580 LOOPATVALUEchar10_t(('FLVN00')('FLVN01'))INTODATA(lv_role)
+.
+581 businesspartnerrole=lv_role.
+582 CALLFUNCTION'BAPI_BUPA_ROLE_ADD_2'
+583 EXPORTING
+584 businesspartner =businesspartner
+585 businesspartnerrole=businesspartnerrole
+586 validfromdate =sy-datum
+587 validuntildate ='99991231'
+588 TABLES
+589 return =return.
+590 IFNOTline_exists(return[type='E']).
+591 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+592 lv_role_status= {lv_role_status}{lv_role}Added. .
+593 ELSE.
+594 lv_role_status= {lv_role_status}{lv_role}Fail:{return[ty
+pe='E']-message}. .
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 66
+595 ENDIF.
+596 CLEAR:businesspartnerrole.
+597 ENDLOOP.
+598
+599 w_log-message= {w_log-message}Roles:{lv_role_status}.
+600 IFwa_file-isecISNOTINITIAL.
+601 industrysector=wa_file-isec.
+602 industrysectorkeysystem='0001'.
+603 defaultindustry=''.
+604
+605 CALLFUNCTION'BAPI_INDUSTRYSECTOR_ADD'
+606 EXPORTING
+607 businesspartner =businesspartner
+608 industrysectorkeysystem=industrysectorkeysystem
+609 industrysector =industrysector
+610 defaultindustry =defaultindustry
+611 TABLES
+612 return =return.
+613
+614 IFline_exists(return[type='E'])ORline_exists(return[type
+='A']).
+615 w_log-message= {w_log-message}IndustryAddFailed: &&
+616 REDUCEstring(INITm=``
+617 FORwaINreturnWHERE(type='E'ORtype='A
+')
+618 NEXTm=COND#(WHENm=``THENwa-message
+619 ELSE {m};{wa-message} )
+).
+620 ELSE.
+621 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+622 w_log-message= {w_log-message}IndustrySector{industrysecto
+r}Added..
+623 ENDIF.
+624 ENDIF.
+625
+626 REFRESH:return.
+627
+628 IFwa_file-identificationcategoryISNOTINITIALANDwa_file-identific
+ationnumberISNOTINITIAL.
+629 DATA:lv_id_from_dateTYPEdats,
+630 lv_id_to_date TYPEdats.
+631
+632 "ConvertDatestoInternalFormat
+633 IFwa_file-id_from_dateISNOTINITIAL.
+634 CALLFUNCTION'CONVERT_DATE_TO_INTERNAL'
+635 EXPORTING
+636 date_external=wa_file-id_from_date
+637 IMPORTING
+638 date_internal=lv_id_from_date
+639 EXCEPTIONS
+640 OTHERS =0.
+641 ENDIF.
+642
+643 IFwa_file-id_to_dateISNOTINITIAL.
+644 CALLFUNCTION'CONVERT_DATE_TO_INTERNAL'
+645 EXPORTING
+646 date_external=wa_file-id_to_date
+647 IMPORTING
+648 date_internal=lv_id_to_date
+649 EXCEPTIONS
+650 OTHERS =0.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 67
+651 ENDIF.
+652
+653 CALLFUNCTION'BAPI_IDENTIFICATION_ADD'
+654 EXPORTING
+655 businesspartner =businesspartner
+656 identificationcategory=CONVbu_id_category(wa_file-identifica
+tioncategory)
+657 identificationnumber =CONVbu_id_number(wa_file-identificati
+onnumber)
+658 identification =VALUEbapibus1006_identification(
+659 identrydate =sy-datum
+660 idvalidfromdate =lv_id_from_date
+661 idvalidtodate =lv_id_to_date)
+662 TABLES
+663 return =return.
+664
+665 "LogonlyErrorsusingREDUCE
+666 IFline_exists(return[type='E'])ORline_exists(return[type
+='A']).
+667 w_log-message= {w_log-message}ID{wa_file-identificationnumb
+er}Error: &&
+668 REDUCEstring(INITm=``
+669 FORwaINreturnWHERE(type='E'ORtype=
+'A')
+670 NEXTm=COND#(WHENm=``THENwa-message
+671 ELSE {m};{wa-message}
+)).
+672 ELSE.
+673 "CommitandWaittofinalizeBPbuffersynchronization
+674 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+675 w_log-message= {w_log-message}ID{wa_file-identificationnumb
+er}Added. .
+676 ENDIF.
+677
+678 CLEAR:lv_id_from_date,lv_id_to_date,return.
+679 ENDIF.
+680
+681 iv_partner= {businesspartnerALPHA=IN}.
+682 wa_file-bpartner=iv_partner.
+683 ENDFORM.
+684 *& *
+685 *&FormUPLOAD_BANK_TO_BP
+686 *& *
+687 *&text
+688 *& *
+689 *& > p1 text
+690 *&< p2 text
+691 *& *
+692 FORMupload_bank_to_bp.
+693 DATA:et_return TYPETABLEOFbapiret2,
+694 et_bank TYPESTANDARDTABLEOFbapibus1006_bankdetails,
+695 et_return1 TYPESTANDARDTABLEOFbapiret2,
+696 ls_bnka_ret TYPEbapiret2,
+697 lv_bank_tempTYPEcLENGTH10.
+698
+699 CLEARiv_partner.
+700
+701 iv_partner= {wa_file-bpartnerALPHA=IN}.
+702
+703 "HandleBankMasterData(bnka)
+704 SELECTSINGLEbanklFROMbnkaINTO@DATA(lv_exists)
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 68
+705 WHEREbanks=@wa_file-banksANDbankl=@wa_file-bankl.
+706
+707 IFsy-subrc<>0.
+708 "UseBAPIinsteadofdirectINSERTBNKA
+709 CALLFUNCTION'BAPI_BANK_CREATE'
+710 EXPORTING
+711 bank_ctry =wa_file-banks "++fieldnamech
+angesbyHemangReqBy:OmPrakashon25/02/2026
+712 bank_key =wa_file-bankl
+713 bank_address=VALUE bapi1011_address(
+714 bank_name =wa_file-banka
+715 swift_code =wa_file-swift
+716 region =wa_file-region_1
+717 street =wa_file-street_1
+718 city =wa_file-city_1
+719 bank_branch=wa_file-brnch)
+720 IMPORTING
+721 return =ls_bnka_ret.
+722 IFls_bnka_ret-type<>'E'.
+723 COMMITWORKANDWAIT."EnsureBNKAisavailableforthenextstep
+724 w_log-message= {w_log-message}BNKACreated..
+725 ELSE.
+726 w_log-message= {w_log-message}ERRORcreatingBNKA:{ls_bnka_
+ret-message}.
+727 ENDIF.
+728 ELSE.
+729 "UpdateexistingBankMasterusingstandardSQLifdetailschanged
+730 UPDATEbnkaSETprovz=@wa_file-region_1,stras=@wa_file-street_1
+,
+731 ort01=@wa_file-city_1,brnch=@wa_file-brnch,
+732 banka=@wa_file-banka,swift=@wa_file-swift
+733 WHEREbanks=@wa_file-banksANDbankl=@wa_file-bankl.
+734
+735 COMMITWORKANDWAIT.
+736 w_log-message= {w_log-message}BNKAUpdated..
+737 ENDIF.
+738
+739 DATA(lv_bank_id)=wa_file-bank_id.
+740
+741 IFlv_bank_idISINITIAL.
+742 CALLFUNCTION'BUPA_BANKDETAILS_GET'
+743 EXPORTING
+744 iv_partner =iv_partner
+745 iv_valid_date =sy-datlo
+746 TABLES
+747 et_bankdetails=et_bank
+748 et_return =et_return1.
+749
+750 lv_bank_temp=lines(et_bank)+1.
+751 lv_bank_id= {lv_bank_tempALPHA=IN}.
+752 ENDIF.
+753
+754 CALLFUNCTION'BUPA_BANKDETAIL_ADD'
+755 EXPORTING
+756 iv_partner =iv_partner
+757 iv_bkvid =CONVbu_bkvid(lv_bank_id)
+758 is_bankdetail=VALUEbapibus1006_bankdetail(
+759 bank_ctry=wa_file-banks
+760 bank_key =wa_file-bankl
+761 bank_acct=wa_file-bankn
+762 accountholder=wa_file-koinh
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 69
+763 bank_ref =wa_file-bkref
+764 ctrl_key =wa_file-controlkey
+765 bankaccountname=wa_file-ebpp_accname)
+766 TABLES
+767 et_return =et_return.
+768
+769 IFNOTline_exists(et_return[type='E']).
+770 COMMITWORKANDWAIT.
+771 w_log-message= {w_log-message}BankDetails(ID:{lv_bank_id})
+Added/Updated..
+772 ELSE.
+773 w_log-message= {w_log-message}BankAddFailed: &&
+774 REDUCEstring(INITm=``
+775 FORwaINet_returnWHERE(type='E')
+776 NEXTm=COND#(WHENm=``THENwa-message
+777 ELSE {m};{wa-message} )
+).
+778 ENDIF.
+779 ENDFORM.
+780 *& *
+781 *&Formextend_bp
+782 *& *
+783 *&text
+784 *& *
+785 *& > p1 text
+786 *&< p2 text
+787 *& *
+788 FORMextend_bp.
+789 LOOPATit_file_extendINTOwa_file_extend.
+790 CLEARw_log_ex.
+791 MOVE-CORRESPONDINGwa_file_extendTOw_log_ex.
+792 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+793 EXPORTING
+794 input =wa_file_extend-bpartner
+795 IMPORTING
+796 output=wa_file_extend-bpartner.
+797 SELECTSINGLEpartner FROMbut000INTOl_partnerWHEREpartner= w
+a_file_extend-bpartner.
+798 IFsy-subrc=0.
+799 businesspartner=wa_file_extend-bpartner.
+800 SELECTSINGLE*FROMbut000INTOwa_but000WHEREpartner=wa_file
+_extend-bpartnerANDpartner_guidNE''.
+801 IFsy-subrc=0.
+802 SELECTSINGLEvendorFROMcvi_vend_linkINTOlv_vendor
+803 WHEREpartner_guid=wa_but000-partner_guid.
+804 IFsy-subrc=0.
+805 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+806 REFRESH:t_lfa1[].
+807 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=l
+v_vendor.
+808 ENDIF.
+809 ENDIF.
+810
+811 ls_vendors-header-object_instance-lifnr=lv_vendor.
+812 ls_vendors-header-object_task='U'.
+813
+814 IFwa_file_extend-bukrsISNOTINITIAL.
+815 REFRESH:lt_company[].
+816 CLEARls_company.
+817 ls_company-task ='M'.
+818 ls_company-data_key-bukrs =wa_file_extend-bukrs.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 70
+819 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+820 EXPORTING
+821 input =wa_file_extend-akont
+822 IMPORTING
+823 output=ls_company-data-akont.
+824 ls_company-data-zterm =wa_file_extend-zterm.
+825 ls_company-datax-akont ='X'.
+826 ls_company-datax-zterm ='X'.
+827 ls_company-data-zuawa=wa_file_extend-zuawa."sortkey
+828 ls_company-datax-zuawa='X'.
+829 ls_company-data-mindk=wa_file_extend-mindk.
+830 ls_company-datax-mindk='X'.
+831 ls_company-data-cerdt =COND#(WHENwa_file-cerdtISNOTINITI
+ALTHEN {wa_file-cerdt+6(4)}{wa_file-cerdt+3(2)}{wa_file-cerdt+0(2
+)} ELSE'').
+832 ls_company-datax-cerdt='X'.
+833 ls_company-data-reprf=wa_file_extend-reprf.
+834 ls_company-datax-reprf='X'.
+835
+836 APPENDls_companyTOls_vendors-company_data-company.
+837
+838 ENDIF.
+839
+840 IFwa_file_extend-ekorgISNOTINITIAL.
+841 REFRESH:et_parvw[],lt_purchasing[].
+842 CLEAR:ls_purchasing.
+843 ls_purchasing-task ='M'.
+844 ls_purchasing-data_key-ekorg=wa_file_extend-ekorg.
+"PURCHASINGORGANIZATION
+845 ls_purchasing-data-waers=wa_file_extend-waers.
+846 ls_purchasing-datax-waers='X'.
+847
+848 ls_purchasing-data-zterm=wa_file_extend-zterm.
+849 ls_purchasing-datax-zterm='X'.
+850 "ADDEDBYKEDARSUBRATON03/08/2018FORSALESPERSONANDTELEP
+HONENUMBERUPDATE
+851 ls_purchasing-data-verkf=wa_file_extend-verkf.
+852 ls_purchasing-datax-verkf='X'.
+853
+854 ls_purchasing-data-telf1=wa_file_extend-telf1.
+855 ls_purchasing-datax-telf1='X'.
+856 "ENDEDBYKEDARSUBRATON03/08/2018FORSALESPERSONANDTELEP
+HONENUMBERUPDATE
+857 ls_purchasing-data-ekgrp=wa_file_extend-ekgrp.
+858 ls_purchasing-datax-ekgrp='X'.
+859
+860 ls_purchasing-data-kalsk =wa_file_extend-kalsk.
+"SCHEMAGROUP,VENDOR
+861 ls_purchasing-datax-kalsk ='X'.
+862
+863 ls_purchasing-data-lebre ='X'.
+"SERVICE-BASEDINVOICEVERIFICATION
+864 ls_purchasing-datax-lebre ='X'.
+865
+866
+867 ls_purchasing-data-webre ='X'."WA_FILE-WEBRE.
+"GRBASEDINVOICEVERIFICATION
+868 ls_purchasing-datax-webre ='X'.
+869
+870 CALLMETHODvmd_ei_api_check=>get_mand_partner_functions
+871 EXPORTING
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 71
+872 iv_ktokk=lfa1-ktokk
+873 IMPORTING
+874 et_parvw=et_parvw.
+875
+876 LOOPATet_parvwINTODATA(wa_parvw).
+877 SELECTSINGLEparvwFROMwyt3
+878 INTO@DATA(lv_pf_exists)
+879 WHERElifnr=@lv_vendor
+880 ANDekorg=@wa_file_extend-ekorg
+881 ANDparvw=@wa_parvw-parvw.
+882
+883 APPENDVALUE#(
+884 task =COND#(WHENlv_pf_existsISNOTINITIALTHEN'M'
+ELSE'I')
+885 data_key=VALUE#(parvw=wa_parvw-parvw)
+886 data =VALUE#(partner=lv_vendor)
+887 datax =VALUE#(partner='X')
+888 )TOlt_purch_func.
+889 ENDLOOP.
+890
+891 ls_purchasing-functions-functions= lt_purch_func[].
+892 APPENDls_purchasingTOls_vendors-purchasing_data-purchasing.
+893 ENDIF.
+894 APPENDls_vendorsTOgs_vmds_extern-vendors.
+895
+896 vmd_ei_api=>initialize().
+897 * CALLTHEMETHODFORCREATIONOFVENDOR.
+898 CALLMETHODvmd_ei_api=>maintain_bapi
+899 EXPORTING
+900 is_master_data =gs_vmds_extern
+901 IMPORTING
+902 es_master_data_correct =gs_vmds_succ
+903 es_message_correct =gs_succ_messages
+904 es_master_data_defective=gs_vmds_error
+905 es_message_defective =gs_err_messages.
+906 IFgs_err_messages-is_errorISINITIAL.
+907 COMMITWORK.
+908 WAITUPTO2SECONDS.
+909 w_log_ex-msgty='S'.
+910 w_log_ex-message= Vendor{lv_vendor}extendedsuccessfully.
+.
+911 CLEARw_msg.
+912 ELSE.
+913 ROLLBACKWORK.
+914 w_log_ex-msgty='E'.
+915 LOOPATgs_err_messages-messagesINTODATA(ls_msg).
+916 IFw_log_ex-messageISINITIAL.
+917 w_log_ex-message=ls_msg-message.
+918 ELSE.
+919 w_log_ex-message= {w_log_ex-message}/{ls_msg-message
+}.
+920 ENDIF.
+921 ENDLOOP.
+922 ENDIF.
+923 APPENDw_log_exTOt_log_ex.
+924 ELSE.
+925 MESSAGE:'PLEASEPROVIDEEXISTINGBPNO'TYPE'I'DISPLAYLIKE'E
+'.
+926 LEAVELIST-PROCESSING.
+927 ENDIF.
+928 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 72
+929 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+930 REFRESH:lt_purch_func[],
+931 ls_vendors-company_data-company[],
+932 ls_vendors-purchasing_data-purchasing[],
+933 gs_vmds_extern-vendors[].
+934 CLEAR:wa_file_extend,gs_vmds_extern,ls_vendors,lv_vendor,busine
+sspartner.
+935 ENDLOOP.
+936 ENDFORM.
+937 *& *
+938 *&Formdownload_log_to_excel
+939 *& *
+940 *&text
+941 *& *
+942 *& > p1 text
+943 *&< p2 text
+944 *& *
+945 FORMdownload_log_to_excel.
+946 DATA:lv_filenameTYPEstring,
+947 lv_path TYPEstring,
+948 lv_fullpathTYPEstring.
+949
+950 cl_gui_frontend_services=>file_save_dialog(
+951 EXPORTING
+952 default_extension='XLSX'
+953 default_file_name= BP_Vendor_Log_{sy-datum}_{sy-uzeit}.xls
+954 CHANGING
+955 filename =lv_filename
+956 path =lv_path
+957 fullpath =lv_fullpath).
+958
+959 IFlv_fullpathISNOTINITIAL.
+960 CALLFUNCTION'GUI_DOWNLOAD'
+961 EXPORTING
+962 filename =lv_fullpath
+963 filetype ='ASC'
+964 write_field_separator='X'"MakesitreadablebyExcel
+965 confirm_overwrite ='X'
+966 TABLES
+967 data_tab =t_log
+968 EXCEPTIONS
+969 file_write_error =1
+970 OTHERS =2.
+971
+972 IFsy-subrc=0.
+973 MESSAGE'Logdownloadedsuccessfully.'TYPE'S'.
+974 ENDIF.
+975 ENDIF.
+976 ENDFORM.
+977 *& *
+978 *&Formdisplay_log
+979 *& *
+980 *&text
+981 *& *
+982 *& > p1 text
+983 *&< p2 text
+984 *& *
+985 FORMdisplay_log.
+986 "InlineFieldCatalogDefinition(Avoidslongmanually-builttables)
+987 DATA(lt_fcat)=VALUEslis_t_fieldcat_alv(
+988 (fieldname='BPARTNER' seltext_m='VendorCode'hotspot='X'
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 73
+)
+989 (fieldname='PARTN_GRP' seltext_m='VendorAccountgroup')
+990 (fieldname='NAME_FIRST' seltext_m='Name1')
+991 (fieldname='NAME_LAST' seltext_m='Name2')
+992 (fieldname='STCD3' seltext_m='GSTTaxNumber')
+993 (fieldname='J_1IPANNO' seltext_m='PanNo')
+994 (fieldname='Flag' seltext_m='ErrorType')
+995 (fieldname='MESSAGE' seltext_m='LogDetails'outputlen=
+255)
+996 ).
+997
+998 DATA(ls_layout)=VALUEslis_layout_alv(
+999 colwidth_optimize='X'
+1000 zebra ='X'
+1001 ).
+1002
+1003 CALLFUNCTION'REUSE_ALV_GRID_DISPLAY'
+1004 EXPORTING
+1005 i_callback_program =sy-repid
+1006 i_callback_user_command='USER_COMMAND'
+1007 i_callback_top_of_page ='TOP_OF_PAGE'
+1008 is_layout =ls_layout
+1009 it_fieldcat =lt_fcat
+1010 TABLES
+1011 t_outtab =t_log
+1012 EXCEPTIONS
+1013 program_error =1
+1014 OTHERS =2.
+1015 ENDFORM.
+1016 *& *
+1017 *&Formdownload_log_to_excel_ex
+1018 *& *
+1019 *&text
+1020 *& *
+1021 *& > p1 text
+1022 *&< p2 text
+1023 *& *
+1024 FORMdownload_log_to_excel_ex.
+1025 DATA:lv_filenameTYPEstring,
+1026 lv_path TYPEstring,
+1027 lv_fullpathTYPEstring.
+1028
+1029 cl_gui_frontend_services=>file_save_dialog(
+1030 EXPORTING
+1031 default_extension='XLSX'
+1032 default_file_name= BP_Vendor__Extension_Log_{sy-datum}_{sy-uz
+eit}.xls
+1033 CHANGING
+1034 filename =lv_filename
+1035 path =lv_path
+1036 fullpath =lv_fullpath).
+1037
+1038 IFlv_fullpathISNOTINITIAL.
+1039 CALLFUNCTION'GUI_DOWNLOAD'
+1040 EXPORTING
+1041 filename =lv_fullpath
+1042 filetype ='ASC'
+1043 write_field_separator='X'"MakesitreadablebyExcel
+1044 confirm_overwrite ='X'
+1045 TABLES
+1046 data_tab =t_log_ex
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 74
+1047 EXCEPTIONS
+1048 file_write_error =1
+1049 OTHERS =2.
+1050
+1051 IFsy-subrc=0.
+1052 MESSAGE'Logdownloadedsuccessfully.'TYPE'S'.
+1053 ENDIF.
+1054 ENDIF.
+1055 ENDFORM.
+1056 *& *
+1057 *&Formdisplay_log_ex
+1058 *& *
+1059 *&text
+1060 *& *
+1061 *& > p1 text
+1062 *&< p2 text
+1063 *& *
+1064 FORMdisplay_log_ex.
+1065 "InlineFieldCatalogDefinition(Avoidslongmanually-builttables)
+1066 DATA(lt_fcat)=VALUEslis_t_fieldcat_alv(
+1067 (fieldname='BPARTNER'seltext_m='VendorCode'hotspot='X')
+1068 (fieldname='BUKRS' seltext_m='CompanyCode')
+1069 (fieldname='EKORG' seltext_m='PurchaseOrganization')
+1070 (fieldname='MSGTY' seltext_m='Status'icon='X')
+1071 (fieldname='MESSAGE' seltext_m='LogDetails'outputlen=255)
+1072 ).
+1073
+1074 DATA(ls_layout)=VALUEslis_layout_alv(
+1075 colwidth_optimize='X'
+1076 zebra ='X'
+1077 ).
+1078
+1079 CALLFUNCTION'REUSE_ALV_GRID_DISPLAY'
+1080 EXPORTING
+1081 i_callback_program =sy-repid
+1082 i_callback_user_command='USER_COMMAND'
+1083 i_callback_top_of_page ='TOP_OF_PAGE_EX'
+1084 is_layout =ls_layout
+1085 it_fieldcat =lt_fcat
+1086 TABLES
+1087 t_outtab =t_log_ex
+1088 EXCEPTIONS
+1089 program_error =1
+1090 OTHERS =2.
+1091 ENDFORM.
+1092 *& *
+1093 *&Formuser_command
+1094 *& *
+1095 *&text
+1096 *& *
+1097 *& > p1 text
+1098 *&< p2 text
+1099 *& *
+1100 "Optional:AddthistomaketheMaterialNumberclickable
+1101 FORMuser_commandUSINGr_ucommLIKEsy-ucomm
+1102 rs_selfieldTYPEslis_selfield.
+1103 CASEr_ucomm.
+1104 WHEN'&IC1'."StandardHotspot/Double-clickcode
+1105 **** IFrs_selfield-fieldname='BPARTNER'ANDrs_selfield-valueIS
+NOTINITIAL.
+1106 **** SETPARAMETERID'BPA'FIELDrs_selfield-value.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 75
+1107 **** CALLTRANSACTION'BP'ANDSKIPFIRSTSCREEN.
+1108 **** ENDIF.
+1109 IFrs_selfield-fieldname='BPARTNER'ANDrs_selfield-valueISNOT
+INITIAL.
+1110
+1111 "1.Createanavigationrequest
+1112 DATA(lo_request)=NEWcl_bupa_navigation_request().
+1113 lo_request->set_partner_number( {rs_selfield-valueALPHA=IN
+} )."Ensureleadingzeros
+1114 lo_request->set_bupa_activity('03')."03=Display,02=Chan
+ge
+1115
+1116 "2.SetUIoptions(optional:hidethelocator/historysidebar)
+1117 DATA(lo_options)=NEWcl_bupa_dialog_joel_options().
+1118 lo_options->set_locator_visible(abap_false).
+1119
+1120 "3.StarttheBPtransactionwiththisspecificnavigation
+1121 cl_bupa_dialog_joel=>start_with_navigation(
+1122 EXPORTING
+1123 iv_request =lo_request
+1124 iv_options =lo_options
+1125 iv_in_new_internal_mode=abap_true"Opensinthesamewind
+ow
+1126 ).
+1127 ENDIF.
+1128 ENDCASE.
+1129 ENDFORM.
+1130 *& *
+1131 *&FORMTOP_OF_PAGE
+1132 *& *
+1133 FORMtop_of_page.
+1134 DATA:lt_headerTYPEslis_t_listheader,
+1135 lv_total TYPEi,
+1136 lv_errorsTYPEi.
+1137
+1138 "Calculatestatsfortheheader
+1139 lv_total =lines(t_log).
+1140 lv_errors=REDUCEi(INITcount=0FORmINt_logWHERE(msgtyCA'
+EA')NEXTcount=count+1).
+1141
+1142 "1.MainTitle(TypeH)
+1143 APPENDVALUE#(typ='H'info='BPVendorUploadExecutionLog')TO
+lt_header.
+1144
+1145 "2.SelectionInfo(TypeS)
+1146 APPENDVALUE#(typ='S'key='Date:' info= {sy-datumDATE=U
+SER} )TOlt_header.
+1147 APPENDVALUE#(typ='S'key='User:' info= {sy-uname} )TO
+lt_header.
+1148
+1149 "3.SummaryAction(TypeA)
+1150 APPENDVALUE#(typ='A'info= TotalRecords:{lv_total} )TOl
+t_header.
+1151 APPENDVALUE#(typ='A'info= ErrorsFound:{lv_errors} )TOlt
+_header.
+1152
+1153 CALLFUNCTION'REUSE_ALV_COMMENTARY_WRITE'
+1154 EXPORTING
+1155 it_list_commentary=lt_header.
+1156 ENDFORM.
+1157 *& *
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 76
+1158 *&FORMTOP_OF_PAGE
+1159 *& *
+1160 FORMtop_of_page_ex.
+1161 DATA:lt_headerTYPEslis_t_listheader,
+1162 lv_total TYPEi,
+1163 lv_errorsTYPEi.
+1164
+1165 "Calculatestatsfortheheader
+1166 lv_total =lines(t_log_ex).
+1167 lv_errors=REDUCEi(INITcount=0FORmINt_log_exWHERE(msgtyC
+A'EA')NEXTcount=count+1).
+1168
+1169 "1.MainTitle(TypeH)
+1170 APPENDVALUE#(typ='H'info='BPVendorExtensionUploadExecution
+Log')TOlt_header.
+1171
+1172 "2.SelectionInfo(TypeS)
+1173 APPENDVALUE#(typ='S'key='Date:' info= {sy-datumDATE=U
+SER} )TOlt_header.
+1174 APPENDVALUE#(typ='S'key='User:' info= {sy-uname} )TO
+lt_header.
+1175
+1176 "3.SummaryAction(TypeA)
+1177 APPENDVALUE#(typ='A'info= TotalRecords:{lv_total} )TOl
+t_header.
+1178 APPENDVALUE#(typ='A'info= ErrorsFound:{lv_errors} )TOlt
+_header.
+1179
+1180 CALLFUNCTION'REUSE_ALV_COMMENTARY_WRITE'
+1181 EXPORTING
+1182 it_list_commentary=lt_header.
+1183 ENDFORM.
+1184 FORMcall_bapi_bupa_central_change.
+1185 CLEARbusinesspartner.
+1186 DATA:tax_returnTYPEbapiret2_t.
+1187 x_save_add-save_addr='X'.
+1188 businesspartner =wa_file-bpartner.
+1189
+1190 "MapdatabasedonPartnerCategoryusingmodernVALUEandSWITCHexp
+ressions
+1191 CASEpartnercategory.
+1192 WHEN1.
+1193 centraldatapersonx=VALUE#(firstname =abap_true
+1194 lastname =abap_true
+1195 birthname =abap_true
+1196 correspondlanguage =abap_true
+1197 correspondlanguageiso=abap_true).
+1198 chk_address =VALUE#(BASEchk_addresslangu='E'languis
+o='EN').
+1199 WHEN2.
+1200 centraldataorganizationx=VALUE#(name1=abap_true
+1201 name2=abap_true
+1202 name3=abap_true
+1203 name4=abap_true
+1204 loc_no_1=abap_true
+1205 loc_no_2=abap_true).
+1206 WHEN3.
+1207 central_groupx =VALUE#(namegroup1='X'
+1208 namegroup2='X').
+1209 ENDCASE.
+1210
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 77
+1211 CALLFUNCTION'BAPI_BUPA_CENTRAL_CHANGE'
+1212 EXPORTING
+1213 businesspartner =wa_file-bpartner
+1214 **** centraldata =centraldata
+1215 centraldataperson =centraldataperson
+1216 centraldataorganization =centraldataorganization
+1217 centraldatagroup =central_group
+1218 **** centraldata_x =centraldatax
+1219 centraldataperson_x =centraldatapersonx
+1220 centraldataorganization_x=centraldataorganizationx
+1221 centraldatagroup_x =central_groupx
+1222 duplicate_check_address =chk_address
+1223 TABLES
+1224 return =return
+1225 * ADDRESSDUPLICATES =
+1226 .
+1227 w_log=CORRESPONDING#(wa_file).
+1228
+1229 IFbusinesspartnerISNOTINITIAL.
+1230 "Synchronouscommit-wait='X'makes'WAITUPTO'unnecessary
+1231 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+1232
+1233 w_log-message=COND#(WHENline_exists(return[type='E'])
+1234 THEN'BUSINESSPARTNERISNOTCHANGED'
+1235 ELSE'BUSINESSPARTNERCHANGED').
+1236
+1237 "HandleTaxUpdateonlyifBPwassuccessful
+1238 **** IFNOTline_exists(return[type='E']).
+1239 **** IFwa_file-stcd3ISNOTINITIALANDwa_file-taxtypeISNOTINI
+TIAL.
+1240 **** wa_final_2-taxnum=wa_file-stcd3.
+1241 **** wa_final_2-taxtype= wa_file-taxtype.
+1242 ****
+1243 **** CALLFUNCTION'BAPI_BUPA_TAX_ADD'
+1244 **** EXPORTING
+1245 **** businesspartner=w_log-bpartner
+1246 **** taxtype =wa_final_2-taxtype
+1247 **** taxnumber =wa_final_2-taxnum
+1248 **** TABLES
+1249 **** return =tax_return.
+1250 **** IFsy-subrc=0.
+1251 **** COMMITWORKANDWAIT.
+1252 **** w_log-message= {w_log-message}&GSTUPDATED.
+1253 **** ELSE.
+1254 **** LOOPATtax_returnINTODATA(ls_ret_gst).
+1255 **** w_log-message= {w_log-message}/GST:{ls_ret_gst-m
+essage}.
+1256 **** ENDLOOP.
+1257 **** ENDIF.
+1258 **** ELSE.
+1259 **** w_log-message='BPCREATED/UPDATED:STCD3GSTMISSINGINFI
+LE'.
+1260 **** ENDIF.
+1261 **** ENDIF.
+1262
+1263 IFline_exists(return[type='E']).
+1264 w_log-message=return[type='E']-message.
+1265 ENDIF.
+1266
+1267 w_log-bpartner=COND#(WHENbusinesspartnerexternISNOTINITIAL
+1268 THENbusinesspartnerextern
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 78
+1269 ELSEbusinesspartner).
+1270
+1271 ENDIF.
+1272
+1273 "Finalglobalvariableupdate
+1274 businesspartner=COND#(WHENbusinesspartnerexternISNOTINITIAL
+1275 THENbusinesspartnerextern
+1276 ELSEbusinesspartner).
+1277 ENDFORM.
+1278 *& *
+1279 *&FormCREATE_BP_VENDOR
+1280 *& *
+1281 *&text
+1282 *& *
+1283 *& > p1 text
+1284 *&< p2 text
+1285 *& *
+1286 FORMchange_bp_vendor.
+1287 LOOPATit_file_extendASSIGNINGFIELD-SYMBOL(<fs_change>).
+1288 CLEAR:businesspartnerextern,
+1289 partnercategory,
+1290 partnergroup,
+1291 centraldata,
+1292 centraldataperson,
+1293 centraldataorganization,
+1294 addressdata.
+1295 CALLFUNCTION'CONVERSION_EXIT_ALPHA_INPUT'
+1296 EXPORTING
+1297 input =<fs_change>-bpartner
+1298 IMPORTING
+1299 output=<fs_change>-bpartner.
+1300
+1301 CLEARbusinesspartnerextern.
+1302
+1303 IFwa_file-bpartnerISNOTINITIAL.
+1304 SELECTSINGLEpartnerFROMbut000INTO@DATA(lv_partner)WHEREpar
+tner=@<fs_change>-bpartner.
+1305 IFsy-subrc<>0.
+1306 businesspartnerextern=<fs_change>-bpartner.
+1307 ENDIF.
+1308 ENDIF.
+1309 IFlv_partnerISNOTINITIALAND<fs_change>-bpartnerISNOTINITIAL
+.
+1310 PERFORMcall_bapi_bupa_central_change.
+1311 ENDIF.
+1312
+1313 IFbusinesspartnerISNOTINITIAL.
+1314 "AddVendorRoles(FLVN00forFI,FLVN01forPurchasing)
+1315 PERFORMadd_vendor_roles.
+1316
+1317 SELECTSINGLElink~vendor
+1318 FROMbut000ASbp
+1319 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+1320 WHEREbp~partner=@wa_file-bpartner
+1321 INTO@DATA(lv_vend_id).
+1322 IFsy-subrc=0.
+1323 lv_vendor=lv_vend_id.
+1324 w_log-message= {w_log-message}LinkedVendor:{lv_vend_id}
+..
+1325 SELECTSINGLE*FROMlfa1WHERElifnr=lv_vendor.
+21.07.26DEV IncludeZMM_VEND_MASTER_FORMS Page 79
+1326 IFsy-subrc=0.
+1327 wa_file-lifnr=lfa1-lifnr.
+1328 ENDIF.
+1329 SELECTSINGLE*FROMbut020WHEREpartner=wa_file-bpartner.
+1330 REFRESH:t_lfa1[].
+1331 SELECTlifnrktokkFROMlfa1INTOTABLEt_lfa1WHERElifnr=lv_
+vendor.
+1332
+1333 CREATEOBJECTlo_data.
+1334 CALLMETHODlo_data->create_vendor_data.
+1335 ENDIF.
+1336 SELECTSINGLElink~vendor
+1337 FROMbut000ASbp
+1338 INNERJOINcvi_vend_linkASlinkONbp~partner_guid=link~partn
+er_guid
+1339 WHEREbp~partner=@wa_file-bpartner
+1340 INTO@lv_vend_id.
+1341 IFlv_vend_idISNOTINITIAL.
+1342 UPDATElfa1SETven_class=wa_file-ven_class
+1343 j_1ipanno=wa_file-j_1ipanno
+1344 j_1iexcd =wa_file-j_1iexcd
+1345 j_1iexrn =wa_file-j_1iexrn
+1346 j_1iexrg =wa_file-j_1iexrg
+1347 j_1iexdi =wa_file-j_1iexdi
+1348 j_1iexco =wa_file-j_1iexco
+1349 j_1ivtyp =wa_file-j_1ivtyp
+1350 j_1isern =wa_file-j_1isern
+1351 j_1kftbus=wa_file-j_1kftbus "JNewlyAdded
+1352 j_1kftind=wa_file-j_1kftind "JNewlyAdded
+1353 bahns =wa_file-bahns "JNewlyAdded
+1354 stenr =wa_file-stenr "JNewlyAdded
+1355 profs =wa_file-profs
+1356 WHERElifnr=lv_vendor.
+1357 COMMITWORKANDWAIT.
+1358 w_log-message= {w_log-message}LFA1datamodified. .
+1359 ENDIF.
+1360 ENDIF.
+1361 APPENDw_logTOt_log.
+1362 CALLFUNCTION'BAPI_TRANSACTION_COMMIT'EXPORTINGwait='X'.
+1363 CALLFUNCTION'BUFFER_REFRESH_ALL'.
+1364 CLEAR:lv_vend_id,businesspartner,wa_file.
+1365 ENDLOOP.
+1366 ENDFORM.
+21.07.26
+DEV
+Program ZMM_VEND_MASTER text e
+Page
+80
+Title:
+Mass Vendor Upload
+Text elements:
+001 Create/Extend Vendor
+002 Extend for New Comp Code & New Pur Org
+003 Future Feature
+101 Select Radio Button
+102 Uplaod File
+103 Download
+Selection texts:
+P_FLNAME
+File Name
+RB_EXT
+Extend for Comp Code & Pur Org
+RB_NEW
+Create Vendor
+21.07.26
+DEV
+Message Class SE
+Page
+81
+Owner........... SAP
+Short text....... Dienstleistungen Stammdaten Leistungsposition
+Edit Language EN
+Status
+20.03.25
+SEPLE
+21.07.26
+DEV
+Internal Program Environment ZMM_VEND_MASTER Page
+82
+Subroutines:
+Line
+Page
+ADD_VENDOR_ROLES.............. ZMM_VEND_MASTER_FORMS 336 23
+ZMM_VEND_MASTER_FORMS
+572 65
+ZMM_VEND_MASTER_FORMS 1315 78
+CALL_BAPI_BUPA_CENTRAL_CHANGE. ZMM_VEND_MASTER_FORMS 329 61
+ZMM_VEND_MASTER_FORMS
+1184 76
+ZMM_VEND_MASTER_FORMS 1310 78
+CALL_BAPI_BUPA_CREATE......... ZMM_VEND_MASTER_FORMS 327 61
+ZMM_VEND_MASTER_FORMS
+508 26
+CHANGE_BP_VENDOR.............. ZMM_VEND_MASTER_FORMS
+1286 78
+CONVERT_DATA_CR............... ZMM_VEND_MASTER 63 3
+ZMM_VEND_MASTER_FORMS
+145 19
+CONVERT_DATA_EX............... ZMM_VEND_MASTER 70 3
+ZMM_VEND_MASTER_FORMS
+217 21
+CREATE_BP_VENDOR.............. ZMM_VEND_MASTER 64 3
+ZMM_VEND_MASTER_FORMS
+289 60
+DISPLAY_LOG................... ZMM_VEND_MASTER 67 3
+ZMM_VEND_MASTER_FORMS
+985 72
+DISPLAY_LOG_EX................ ZMM_VEND_MASTER 74 3
+ZMM_VEND_MASTER_FORMS
+1064 36
+DOWNLOAD_LOG_TO_EXCEL......... ZMM_VEND_MASTER 66 3
+ZMM_VEND_MASTER_FORMS
+945 72
+DOWNLOAD_LOG_TO_EXCEL_EX...... ZMM_VEND_MASTER 73 3
+ZMM_VEND_MASTER_FORMS
+1024 73
+DOWNLOAD_TEMPLATE............. ZMM_VEND_MASTER 44 2
+ZMM_VEND_MASTER_FORMS
+4 17
+EXTEND_BP..................... ZMM_VEND_MASTER 71 3
+ZMM_VEND_MASTER_FORMS
+788 69
+FILL_ADDRESS_VENDOR........... ZMM_VEND_MASTER_FORMS 313 60
+ZMM_VEND_MASTER_FORMS
+422 62
+FILL_CENTRAL_DATA_VENDOR...... ZMM_VEND_MASTER_FORMS 312 60
+ZMM_VEND_MASTER_FORMS
+392 62
+TOP_OF_PAGE................... ZMM_VEND_MASTER_FORMS
+TOP_OF_PAGE_EX................ ZMM_VEND_MASTER_FORMS
+1133 75
+1160 38
+UPLOAD_BANK_TO_BP............. ZMM_VEND_MASTER_CL 275 54
+ZMM_VEND_MASTER_FORMS
+692 29
+UPLOAD_EXCEL.................. ZMM_VEND_MASTER 61 3
+ZMM_VEND_MASTER_FORMS
+105 19
+USER_COMMAND.................. ZMM_VEND_MASTER_FORMS
+1101 36
+VALUE_REQUEST................. ZMM_VEND_MASTER 51 2
+ZMM_VEND_MASTER_FORMS
+90 19
+Messages:
+?............................. ZMM_VEND_MASTER_FORMS
+?............................. ZMM_VEND_MASTER_FORMS
+?............................. ZMM_VEND_MASTER_FORMS
+Line
+925
+973
+1052
+Page
+71
+72
+36
+21.07.26DEV InternalProgramEnvironmentZMM_VEND_MASTER Page 83
+Externalcalls
+FunctionModules Line Page
+BAPI_BANK_CREATE..............ZMM_VEND_MASTER_FORMS 709 30
+BAPI_BUPA_CENTRAL_CHANGE......ZMM_VEND_MASTER_FORMS 1211 77
+BAPI_BUPA_CREATE_FROM_DATA....ZMM_VEND_MASTER_FORMS 511 26
+BAPI_BUPA_ROLE_ADD_2..........ZMM_VEND_MASTER_FORMS 582 65
+BAPI_IDENTIFICATION_ADD.......ZMM_VEND_MASTER_FORMS 653 29
+BAPI_INDUSTRYSECTOR_ADD.......ZMM_VEND_MASTER_FORMS 605 28
+BAPI_TRANSACTION_COMMIT.......ZMM_VEND_MASTER_FORMS 387 24
+ZMM_VEND_MASTER_FORMS 535 26
+ZMM_VEND_MASTER_FORMS 591 27
+ZMM_VEND_MASTER_FORMS 621 28
+ZMM_VEND_MASTER_FORMS 674 29
+ZMM_VEND_MASTER_FORMS 928 71
+ZMM_VEND_MASTER_FORMS 1231 77
+ZMM_VEND_MASTER_FORMS 1362 79
+BUFFER_REFRESH_ALL............ZMM_VEND_MASTER_FORMS 388 24
+ZMM_VEND_MASTER_FORMS 929 72
+ZMM_VEND_MASTER_FORMS 1363 79
+BUPA_BANKDETAILS_GET..........ZMM_VEND_MASTER_FORMS 742 68
+BUPA_BANKDETAIL_ADD...........ZMM_VEND_MASTER_FORMS 754 30
+CONVERSION_EXIT_ALPHA_INPUT...ZMM_VEND_MASTER_FORMS 300 60
+ZMM_VEND_MASTER_FORMS 792 69
+ZMM_VEND_MASTER_FORMS 819 70
+ZMM_VEND_MASTER_FORMS 1295 40
+CONVERT_DATE_TO_INTERNAL......ZMM_VEND_MASTER_FORMS 634 28
+ZMM_VEND_MASTER_FORMS 644 28
+F4_FILENAME...................ZMM_VEND_MASTER_FORMS 91 19
+GUI_DOWNLOAD..................ZMM_VEND_MASTER_FORMS 74 56
+ZMM_VEND_MASTER_FORMS 960 72
+ZMM_VEND_MASTER_FORMS 1039 73
+GUI_UPLOAD....................ZMM_VEND_MASTER_FORMS 110 57
+REUSE_ALV_COMMENTARY_WRITE....ZMM_VEND_MASTER_FORMS 1153 37
+ZMM_VEND_MASTER_FORMS 1180 76
+REUSE_ALV_GRID_DISPLAY........ZMM_VEND_MASTER_FORMS 1003 73
+ZMM_VEND_MASTER_FORMS 1079 36
+SCMS_BINARY_TO_XSTRING........ZMM_VEND_MASTER_FORMS 159 58
+ZMM_VEND_MASTER_FORMS 231 59
+21.07.26DEV InternalProgramEnvironmentZMM_VEND_MASTER Page 84
+DATABASEOPERATIONS
+SELECT: Line Page
+BNKA..........................ZMM_VEND_MASTER_FORMS 704 67
+BUT000........................ZMM_VEND_MASTER_FORMS 319 60
+ZMM_VEND_MASTER_FORMS 339 23
+ZMM_VEND_MASTER_FORMS 358 61
+ZMM_VEND_MASTER_FORMS 797 69
+ZMM_VEND_MASTER_FORMS 800 69
+ZMM_VEND_MASTER_FORMS 1304 78
+ZMM_VEND_MASTER_FORMS 1318 40
+ZMM_VEND_MASTER_FORMS 1337 41
+BUT020........................ZMM_VEND_MASTER_FORMS 350 61
+ZMM_VEND_MASTER_FORMS 1329 41
+CVI_VEND_LINK.................ZMM_VEND_MASTER_FORMS 802 69
+LFA1..........................ZMM_VEND_MASTER_FORMS 346 61
+ZMM_VEND_MASTER_FORMS 352 61
+ZMM_VEND_MASTER_FORMS 805 69
+ZMM_VEND_MASTER_FORMS 807 69
+ZMM_VEND_MASTER_FORMS 1325 78
+ZMM_VEND_MASTER_FORMS 1331 41
+WYT3..........................ZMM_VEND_MASTER_CL 228 53
+ZMM_VEND_MASTER_FORMS 877 33
+UPDATE: Line Page
+BNKA..........................ZMM_VEND_MASTER_FORMS 730 68
+LFA1..........................ZMM_VEND_MASTER_FORMS 364 23
+ZMM_VEND_MASTER_FORMS 1342 41
+MODIFY: Line Page
+DFKKBPTAXNUM..................ZMM_VEND_MASTER_FORMS 542 27
+21.07.26
+DEV
+Internal Program Environment ZMM_VEND_MASTER Page
+85
+INTERNAL TABLE OPERATIONS
+READ TABLE:
+LT_WORKSHEETS................. ZMM_VEND_MASTER_FORMS
+T_LFA1........................ ZMM_VEND_MASTER_CL
+Line
+Page
+184
+ZMM_VEND_MASTER_FORMS
+256
+148
+58
+59
+52
+DELETE:
+IT_FILE....................... ZMM_VEND_MASTER_FORMS
+Line
+Page
+291
+60
